@@ -1,0 +1,83 @@
+# ============================================================
+# QLoRA Fine-Tuning Configuration — MedQuAD / Llama-3.2-3B
+# All hyperparameters in one place for reproducibility.
+# Override any value via CLI flags in train_lora.py.
+# ============================================================
+
+# ── Model ----------------------------------------------
+model:
+  name: "unsloth/Llama-3.2-3B-Instruct"
+  # Alternatives (larger, need more VRAM):
+  #   unsloth/Meta-Llama-3.1-8B-Instruct
+  #   unsloth/mistral-7b-instruct-v0.3
+  max_seq_length: 2048             # Llama-3.2 supports up to 131072
+  dtype: null                      # null = auto-detect (bfloat16 on Ampere+)
+  load_in_4bit: true               # QLoRA: quantize base to 4-bit
+
+# ── LoRA Adapter --------------------------------------------
+lora:
+  r: 16                            # Rank — higher = more params, better quality
+  lora_alpha: 32                   # Alpha = 2×r is a safe default
+  lora_dropout: 0.05
+  bias: "none"
+  use_gradient_checkpointing: "unsloth"   # Unsloth's optimised version
+  random_state: 42
+  use_rslora: false                # Rank-stabilised LoRA — try true if unstable
+  # Target modules — Unsloth handles this automatically for supported models
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+#  Dataset ------------------------------------------------
+dataset:
+  train_path: "data/processed/train.jsonl"
+  val_path: "data/processed/val.jsonl"
+  test_path: "data/processed/test.jsonl"
+  max_samples: null                # null = use all; set to e.g. 2000 for a quick test run
+  # Instruction template — wraps each Q&A pair for Llama chat format
+  instruction_template: |
+    You are a knowledgeable medical assistant. Answer the following medical question
+    accurately and concisely, based only on established medical knowledge.
+    
+    Question: {question}
+    
+    Answer: {answer}
+
+#  Training  ------------------------------------------------
+training:
+  output_dir: "./checkpoints/medquad-lora"
+  per_device_train_batch_size: 2   # Increase if VRAM allows
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 4   # Effective batch = 2 × 4 = 8
+  num_train_epochs: 3
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  warmup_steps: 50                 # ~5% of total steps typically
+  lr_scheduler_type: "cosine"
+  fp16: false                      # Use bf16 instead on Ampere+ GPUs
+  bf16: true
+  logging_steps: 10
+  eval_steps: 100
+  save_steps: 200
+  save_total_limit: 3              # Keep only the 3 most recent checkpoints
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  greater_is_better: false
+  report_to: "wandb"               # "wandb" | "none" | "tensorboard"
+  seed: 42
+  # Unsloth-specific: pack sequences for higher GPU utilisation
+  packing: true
+  dataset_num_proc: 2
+
+# - Inference (for evaluation & serving)------------------------------
+inference:
+  max_new_tokens: 512
+  temperature: 0.1                 # Low temperature for factual medical answers
+  top_p: 0.9
+  do_sample: true
+  repetition_penalty: 1.15

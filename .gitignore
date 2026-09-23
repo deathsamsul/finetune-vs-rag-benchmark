@@ -1,0 +1,58 @@
+# Secrets — NEVER commit
+.env
+.env.example
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+env/
+.Python
+
+# Model artifacts (too large for git — use HF Hub or W&B artifacts)
+checkpoints/
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# Vector index (regenerate with build_index.py)
+indexes/
+
+# Data (regenerate with prepare_data.py)
+data/raw/
+data/processed/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+note.md
+docs
+process.md
+
+# Logs & outputs
+*.log
+logs/
+wandb/
+langfuse_cache/
+
+# Results (commit these — they're small and important)
+# evaluation/results/ is intentionally NOT in .gitignore
