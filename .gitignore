@@ -1,6 +1,5 @@
-# Secrets — NEVER commit
+# Secrets
 .env
-.env.example
 *.key
 *.pem
 
@@ -19,7 +18,7 @@ venv/
 env/
 .Python
 
-# Model artifacts (too large for git — use HF Hub or W&B artifacts)
+# fine-tuned Model artifacts (too large for git — use HF Hub or W&B artifacts)
 checkpoints/
 *.bin
 *.safetensors
@@ -54,5 +53,3 @@ logs/
 wandb/
 langfuse_cache/
 
-# Results (commit these — they're small and important)
-# evaluation/results/ is intentionally NOT in .gitignore
