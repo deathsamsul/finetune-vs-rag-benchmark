@@ -1,7 +1,7 @@
 """
 train_lora.py — QLoRA Fine-Tuning with Unsloth + W&B Tracking
 
-Day 1 script. Fine-tunes Llama-3.2-3B-Instruct on MedQuAD using QLoRA.
+ Fine-tunes Llama-3.2-3B-Instruct on MedQuAD using QLoRA.
 
 Usage:
     python finetuning/train_lora.py                        # uses config.yaml defaults

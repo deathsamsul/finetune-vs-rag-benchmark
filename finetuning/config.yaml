@@ -4,7 +4,7 @@
 # Override any value via CLI flags in train_lora.py.
 # ============================================================
 
-# ── Model ----------------------------------------------
+#  Model ----------------------------------------------
 model:
   name: "unsloth/Llama-3.2-3B-Instruct"
   # Alternatives (larger, need more VRAM):
@@ -14,7 +14,7 @@ model:
   dtype: null                      # null = auto-detect (bfloat16 on Ampere+)
   load_in_4bit: true               # QLoRA: quantize base to 4-bit
 
-# ── LoRA Adapter --------------------------------------------
+#  LoRA Adapter --------------------------------------------
 lora:
   r: 16                            # Rank — higher = more params, better quality
   lora_alpha: 32                   # Alpha = 2×r is a safe default
@@ -29,8 +29,8 @@ lora:
     - k_proj
     - v_proj
     - o_proj
-    - gate_proj
-    - up_proj
+    - gate_proj                       # MLP(x) = down_proj( activation(gate_proj(x)) ⊙ up_proj(x) )
+    - up_proj                         # After the MLP has expanded the representation: 2-> 10 then 10->2
     - down_proj
 
 #  Dataset ------------------------------------------------
@@ -47,6 +47,8 @@ dataset:
     Question: {question}
     
     Answer: {answer}
+
+
 
 #  Training  ------------------------------------------------
 training:
