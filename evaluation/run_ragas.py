@@ -234,46 +234,128 @@ def build_ragas_dataset_finetuned(
 
     return Dataset.from_list(rows)
 
+# --------- rugs for openai evaluation--------------
+# def run_ragas(
+#     dataset,
+#     metrics: list[str],
+#     pipeline_name: str, ) -> dict:
+#     """
+#     Run RAGAS evaluation on a dataset.
+#     Returns a dict mapping metric names to scores.
+#     """
+#     from ragas import evaluate
+#     from ragas.metrics import (
+#         faithfulness,
+#         answer_relevancy,
+#         context_precision,
+#     )
 
+#     metric_map = {
+#         "faithfulness":      faithfulness,
+#         "answer_relevancy":  answer_relevancy,
+#         "context_precision": context_precision,
+#     }
+
+#     selected = [metric_map[m] for m in metrics if m in metric_map]
+#     # context_precision makes no sense for fine-tuned (no real retrieval step)
+#     if pipeline_name == "finetuned" and context_precision in selected:
+#         selected.remove(context_precision)
+#         console.print("  [dim]context_precision skipped for fine-tuned (no retrieval)[/dim]")
+
+#     console.print(f"  Running RAGAS with {len(selected)} metrics...")
+#     result = evaluate(dataset, metrics=selected)
+
+#     # Convert to plain dict with float values
+#     scores = {}
+#     for metric in selected:
+#         key = metric.name
+#         scores[key] = float(result[key])
+
+#     return scores
+# ----- google gemini evaluation-----------
 def run_ragas(
     dataset,
     metrics: list[str],
-    pipeline_name: str, ) -> dict:
-    """
-    Run RAGAS evaluation on a dataset.
-    Returns a dict mapping metric names to scores.
-    """
+    pipeline_name: str,
+) -> dict:
+    """Run RAGAS evaluation using Gemini and return mean metric scores."""
+    import os
+    from dotenv import load_dotenv
+    from langchain_google_genai import (
+        ChatGoogleGenerativeAI,
+        GoogleGenerativeAIEmbeddings,
+    )
     from ragas import evaluate
+    from ragas.llms import LangchainLLMWrapper
+    from ragas.embeddings import LangchainEmbeddingsWrapper
     from ragas.metrics import (
         faithfulness,
         answer_relevancy,
         context_precision,
     )
 
+    load_dotenv()
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY not found in .env")
+
+    evaluator_llm = LangchainLLMWrapper(
+        ChatGoogleGenerativeAI(
+            model="gemini-3.8-flash",
+            google_api_key=api_key,
+            temperature=0,
+        )
+    )
+
+    evaluator_embeddings = LangchainEmbeddingsWrapper(
+        GoogleGenerativeAIEmbeddings(
+            model="models/gemini-embedding-001",
+            google_api_key=api_key,
+        )
+    )
+
     metric_map = {
-        "faithfulness":      faithfulness,
-        "answer_relevancy":  answer_relevancy,
+        "faithfulness": faithfulness,
+        "answer_relevancy": answer_relevancy,
         "context_precision": context_precision,
     }
 
-    selected = [metric_map[m] for m in metrics if m in metric_map]
-    # context_precision makes no sense for fine-tuned (no real retrieval step)
+    selected = [
+        metric_map[m] for m in metrics if m in metric_map
+    ]
+
     if pipeline_name == "finetuned" and context_precision in selected:
         selected.remove(context_precision)
-        console.print("  [dim]context_precision skipped for fine-tuned (no retrieval)[/dim]")
+        console.print(
+            "  [dim]context_precision skipped for fine-tuned "
+            "(no retrieval)[/dim]"
+        )
 
-    console.print(f"  Running RAGAS with {len(selected)} metrics...")
-    result = evaluate(dataset, metrics=selected)
+    console.print(
+        f"  Running RAGAS with {len(selected)} metrics using Gemini..."
+    )
 
-    # Convert to plain dict with float values
+    result = evaluate(
+        dataset,
+        metrics=selected,
+        llm=evaluator_llm,
+        embeddings=evaluator_embeddings,
+    )
+
     scores = {}
     for metric in selected:
         key = metric.name
-        scores[key] = float(result[key])
+        values = [
+            float(value)
+            for value in result[key]
+            if value is not None
+        ]
+        scores[key] = (
+            sum(values) / len(values) if values else None
+        )
 
     return scores
-
-
 
 
 def collect_latency_stats(samples_queried: list[dict]) -> dict:

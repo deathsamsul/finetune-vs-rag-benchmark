@@ -1,7 +1,7 @@
 """
 build_index.py — Chunk corpus + embed + build FAISS index.
 
-Day 2 script. Reads the corpus.jsonl produced by prepare_data.py,
+script. Reads the corpus.jsonl produced by prepare_data.py,
 splits documents into overlapping chunks, embeds them with
 sentence-transformers, and saves a FAISS index to disk.
 
@@ -22,9 +22,11 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+# from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain.schema import Document
+# from langchain.schema import Document
+from langchain_core.documents import Document
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import track
@@ -158,15 +160,15 @@ def main():
     args = parse_args()
 
     console.print(Panel.fit(
-        "[bold blue]🗂️  Building FAISS RAG Index — MedQuAD[/bold blue]\n"
+        "[bold blue]  Building FAISS RAG Index — MedQuAD[/bold blue]\n"
         "[dim]Day 2: Chunk → Embed → Index[/dim]"
     ))
 
-    # ── Load corpus ────────────────────────────────────────────────────────────
+    #  Load corpus 
     console.print("\n[bold]Step 1/4 — Loading corpus...[/bold]")
     raw_docs = load_corpus(args.data_path, args.max_docs)
 
-    # ── Chunk ──────────────────────────────────────────────────────────────────
+    #  Chunk 
     console.print("\n[bold]Step 2/4 — Chunking documents...[/bold]")
     lc_docs = docs_to_langchain(raw_docs, args.chunk_size, args.chunk_overlap)
     console.print(
@@ -174,17 +176,17 @@ def main():
         f"(avg {len(lc_docs)/len(raw_docs):.1f} chunks/doc)"
     )
 
-    # ── Load Embeddings ────────────────────────────────────────────────────────
+    #  Load Embeddings
     console.print("\n[bold]Step 3/4 — Loading embedding model...[/bold]")
     embeddings = get_embeddings()
 
-    # ── Build Index ────────────────────────────────────────────────────────────
+    #  Build Index 
     console.print("\n[bold]Step 4/4 — Building FAISS index...[/bold]")
     start = time.time()
     index = build_faiss_index(lc_docs, args.batch_size, embeddings)
     elapsed = time.time() - start
 
-    # ── Save ───────────────────────────────────────────────────────────────────
+    #  Save 
     index_path = Path(args.index_path)
     index_path.mkdir(parents=True, exist_ok=True)
     index.save_local(str(index_path))
