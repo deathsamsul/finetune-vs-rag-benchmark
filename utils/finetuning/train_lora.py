@@ -13,19 +13,17 @@ Outputs:
     wandb/                             training curves (auto-synced)
 """
 
-import argparse
 import json
 import os
 import sys
 import time
 from pathlib import Path
-
 import yaml
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-
+from utils.args import fine_tune_parse_args
 load_dotenv()
 console = Console()
 
@@ -52,34 +50,6 @@ def load_config(config_path: str = "finetuning/config.yaml") -> dict:
         return yaml.safe_load(f)
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="QLoRA fine-tuning on MedQuAD via Unsloth",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("--model", type=str, default=None,
-                        help="HuggingFace model name (overrides config)")
-    parser.add_argument("--dataset", type=str, default=None,
-                        help="Path to train.jsonl (overrides config)")
-    parser.add_argument("--val_dataset", type=str, default=None,
-                        help="Path to val.jsonl (overrides config)")
-    parser.add_argument("--method", choices=["lora", "qlora"], default="qlora",
-                        help="Fine-tuning method")
-    parser.add_argument("--epochs", type=int, default=None,
-                        help="Training epochs (overrides config)")
-    parser.add_argument("--lr", type=float, default=None,
-                        help="Learning rate (overrides config)")
-    parser.add_argument("--output_dir", type=str, default=None,
-                        help="Checkpoint output directory (overrides config)")
-    parser.add_argument("--max_samples", type=int, default=None,
-                        help="Limit training samples (for quick tests)")
-    parser.add_argument("--config", type=str, default="finetuning/config.yaml",
-                        help="Path to YAML config file")
-    parser.add_argument("--no_wandb", action="store_true",
-                        help="Disable Weights & Biases logging")
-    parser.add_argument("--dry_run", action="store_true",
-                        help="Validate config & data then exit without training")
-    return parser.parse_args()
 
 
 def format_instruction(sample: dict, template: str) -> str:
@@ -207,7 +177,7 @@ def print_training_summary(cfg: dict, args, n_train: int, n_val: int):
 
 
 def main():
-    args = parse_args()
+    args = fine_tune_parse_args()
     cfg = load_config(args.config)
 
     console.print(Panel.fit(

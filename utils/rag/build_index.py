@@ -20,41 +20,20 @@ import argparse
 import json
 import time
 from pathlib import Path
-
 from dotenv import load_dotenv
-# from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-# from langchain.schema import Document
 from langchain_core.documents import Document
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import track
-
-from rag.embeddings import get_embeddings
+from utils.args import build_index_parse_args
+from utils.rag.embeddings import get_embeddings
 
 load_dotenv()
 console = Console()
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Build FAISS vector index from MedQuAD corpus",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("--data_path", type=str, default="data/processed/",
-                        help="Directory containing corpus.jsonl")
-    parser.add_argument("--index_path", type=str, default="./indexes/medquad_faiss",
-                        help="Output path for FAISS index")
-    parser.add_argument("--chunk_size", type=int, default=500,
-                        help="Max characters per chunk")
-    parser.add_argument("--chunk_overlap", type=int, default=100,
-                        help="Characters overlap between chunks")
-    parser.add_argument("--batch_size", type=int, default=256,
-                        help="Embedding batch size (reduce if OOM)")
-    parser.add_argument("--max_docs", type=int, default=None,
-                        help="Limit docs for quick test (None = all)")
-    return parser.parse_args()
 
 
 def load_corpus(data_path: str, max_docs: int | None) -> list[dict]:
@@ -79,18 +58,15 @@ def load_corpus(data_path: str, max_docs: int | None) -> list[dict]:
 
 
 def docs_to_langchain(
-    raw_docs: list[dict],
-    chunk_size: int,
-    chunk_overlap: int,
-) -> list[Document]:
+        raw_docs: list[dict],
+        chunk_size: int,
+        chunk_overlap: int, ) -> list[Document]:
     """
     Convert raw corpus entries to LangChain Documents with chunking.
-    
     Strategy:
     - Each Q&A pair becomes its own Document
     - Long answers are split into overlapping chunks
-    - Metadata carries the original doc id, question, and source chunk index
-    
+    - Metadata carries the original doc id, question, and source chunk index   
     Why chunk?
     The embedding model has a max input length (~256 tokens for MiniLM).
     Long answers that exceed this are truncated, losing information.
@@ -131,7 +107,6 @@ def build_faiss_index(
 ) -> FAISS:
     """
     Build FAISS index from LangChain Documents.
-    
     Embeds in batches to avoid OOM on large corpora.
     FAISS uses IndexFlatL2 by default (exact search, no approximation).
     For > 1M chunks, consider IndexIVFFlat for faster approximate search.
@@ -157,7 +132,7 @@ def build_faiss_index(
 
 
 def main():
-    args = parse_args()
+    args = build_index_parse_args()
 
     console.print(Panel.fit(
         "[bold blue]  Building FAISS RAG Index — MedQuAD[/bold blue]\n"

@@ -49,7 +49,7 @@ class FineTunedInference:
 
     def generate(self, question: str) -> dict:
         import torch
-        from finetuning.utils import format_for_inference
+        from evaluation.utils.finetuning.utils import format_for_inference
 
         inputs = self.tokenizer(format_for_inference(question), return_tensors="pt")
         inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
