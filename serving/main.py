@@ -78,7 +78,7 @@ async def lifespan(app: FastAPI):
     # ── RAG chain ──────────────────────────────────────────────────────────────
     rag_index_path = os.getenv("FAISS_INDEX_PATH", "./indexes/medquad_faiss")
     try:
-        from rag.rag_chain import RAGChain
+        from utils.rag.rag_chain import RAGChain
         state.rag_chain = RAGChain(index_path=rag_index_path)
         state.rag_chain.load()
         logger.info("RAG chain loaded ✓")
@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
     # ── Fine-Tuned model ───────────────────────────────────────────────────────
     checkpoint_dir = os.getenv("CHECKPOINT_DIR", "./checkpoints/medquad-lora")
     try:
-        from evaluation.run_ragas import FineTunedInference
+        from evaluation.run_ragas1 import FineTunedInference
         state.ft_model = FineTunedInference(checkpoint_dir)
         state.ft_model.load()
         logger.info("Fine-tuned model loaded ✓")
@@ -242,7 +242,7 @@ async def query(req: QueryRequest):
 
         trace_data = {}
         if state.ft_tracer:
-            from finetuning.utils import format_for_inference
+            from evaluation.utils.finetuning.utils import format_for_inference
             prompt_repr = format_for_inference(req.question)
             trace_data = state.ft_tracer.trace_generation(
                 question=req.question,

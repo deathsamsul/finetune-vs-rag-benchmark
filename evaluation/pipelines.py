@@ -1,6 +1,6 @@
 import time
 from dataclasses import dataclass
-from finetuning.inference import FineTunedInference
+from utils.finetuning.inference import FineTunedInference
 
 ALL_METRICS = {"faithfulness", "answer_relevancy", "context_precision"}
 
@@ -32,7 +32,7 @@ class RAGPipeline:
     metrics = ALL_METRICS
 
     def __init__(self, index_path: str, k: int):
-        from rag.rag_chain import RAGChain
+        from utils.rag.rag_chain import RAGChain
 
         self.chain = RAGChain(index_path=index_path, k=k)
         self.chain.load()

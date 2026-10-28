@@ -35,6 +35,6 @@ def get_embeddings(model_name: str = EMBEDDING_MODEL) -> HuggingFaceEmbeddings:
     console.print(f"  Loading embedding model: [bold]{model_name}[/bold]")
     return HuggingFaceEmbeddings(
         model_name=model_name,
-        model_kwargs={"device": "cpu"},   # change to "cuda" if GPU available
+        model_kwargs={"device": "cuda"},   # change to "cuda" if GPU available
         encode_kwargs={"normalize_embeddings": True},
     )
