@@ -1,0 +1,17 @@
+{
+  "input_scores_json": "evaluation/results/ragas_scores.json",
+  "input_disagreements_csv": "evaluation/results/disagreements.csv",
+  "aggregate_samples": 2,
+  "csv_rows": 1,
+  "charts": [
+    "aggregate_metric_comparison.png",
+    "latency_comparison.png",
+    "per_sample_score_comparison.png",
+    "score_delta.png"
+  ],
+  "report": "evaluation/results/visualizations/benchmark_report.html",
+  "social_post_draft": "evaluation/results/visualizations/linkedin_post_draft.md",
+  "warnings": [
+    "Aggregate JSON says n_samples=2, but disagreements.csv contains 1 row(s). These files may come from different runs or the CSV may contain only a subset."
+  ]
+}

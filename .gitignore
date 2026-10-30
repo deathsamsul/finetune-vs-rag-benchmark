@@ -43,6 +43,7 @@ data/processed/
 *.swo
 .DS_Store
 
+linkedin_post_draft.md
 note.md
 docs
 process.md

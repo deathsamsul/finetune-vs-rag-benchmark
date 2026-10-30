@@ -1,0 +1,68 @@
+# ============================================================
+# finetune-vs-rag-medqa — pinned dependencies
+# Python 3.10+ required
+# ============================================================
+
+# ── Core ML ─────────────────────────────────────────────────
+torch
+torchvision
+#ransformers==4.45.0
+transformers
+datasets
+accelerate
+peft
+bitsandbytes
+sentencepiece
+protobuf
+
+
+# ── Unsloth (fast LoRA/QLoRA) ───────────────────────────────
+# Install separately in Colab with the Colab-specific command
+# For local: pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+# Listed here for reference — comment out if using vanilla PEFT
+# unsloth @ git+https://github.com/unslothai/unsloth.git
+
+
+
+# ── Hugging Face Hub ─────────────────────────────────────────
+huggingface-hub
+tokenizers
+
+# ── RAG Stack ───────────────────────────────────────────────
+langchain
+langchain-community
+langchain-core
+langchain-huggingface
+faiss-cpu            # Use faiss-gpu if you have CUDA
+sentence-transformers
+
+# ── Evaluation ──────────────────────────────────────────────
+ragas
+langchain-openai    # RAGAS uses OpenAI as judge by default
+openai              # Required by RAGAS LLM judge
+
+# ── Observability & Tracking ────────────────────────────────
+langfuse
+wandb
+
+# ── Serving ─────────────────────────────────────────────────
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+python-multipart
+httpx
+
+# ── Data Utilities ──────────────────────────────────────────
+numpy
+pandas
+tqdm
+python-dotenv
+rich            # Pretty terminal output
+PyYAML
+jsonlines
+tabulate
+
+# ── Notebook ─────────────────────────────────────────────────
+ipykernel
+ipywidgets
