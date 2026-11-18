@@ -91,7 +91,7 @@ class RAGChain:
                 token=os.getenv("HF_TOKEN"),
                 low_cpu_mem_usage=True,
             )
-            pipeline_device = 0
+            pipeline_kwargs = {}  # accelerate handles device placement; do NOT pass device to pipeline
         else:
             # CPU path — do NOT use device_map="auto" (offloads to disk → crash)
             console.print(
@@ -104,7 +104,7 @@ class RAGChain:
                 token=os.getenv("HF_TOKEN"),
                 low_cpu_mem_usage=True,
             )
-            pipeline_device = -1      # -1 = CPU for pipeline()
+            pipeline_kwargs = {"device": -1}      # -1 = CPU for pipeline()
 
         model.eval()
 
@@ -112,13 +112,13 @@ class RAGChain:
             "text-generation",
             model=model,
             tokenizer=tokenizer,
-            device=pipeline_device,   # int only — not a device_map string
             max_new_tokens=512,
             temperature=0.1,
             top_p=0.9,
             do_sample=True,
             repetition_penalty=1.15,
             return_full_text=False,
+            **pipeline_kwargs,
         )
         llm = HuggingFacePipeline(pipeline=hf_pipe)
         console.print("  ✓ LLM loaded")

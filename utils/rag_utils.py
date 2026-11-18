@@ -52,12 +52,23 @@ def run_ragas(dataset, metrics: list, pipeline_name: str ,get_metrics,build_judg
     #     raise SystemExit(1)
 
     
-    # Validate Groq API key
-    api_key = os.getenv("GROQ_API_KEY", "").strip()
-    GROQ_MODEL = os.getenv("GROQ_MODEL", "").strip()
+    # Validate API key based on chosen judge
+    judge_model = os.getenv("JUDGE_MODEL", "groq").strip().lower()
+    if judge_model == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        key_name = "GEMINI_API_KEY"
+    elif judge_model == "openrouter":
+        api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        key_name = "OPENROUTER_API_KEY"
+    elif judge_model == "openai":
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        key_name = "OPENAI_API_KEY"
+    else:
+        api_key = os.getenv("GROQ_API_KEY", "").strip()
+        key_name = "GROQ_API_KEY"
+
     if not api_key:
-        console.print("[red]GROQ_API_KEY not set in .env[/red]")
-        console.print("  Create a key at: https://console.groq.com/keys")
+        console.print(f"[red]{key_name} not set in environment[/red]")
         raise SystemExit(1)
 
 

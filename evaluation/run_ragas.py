@@ -89,7 +89,7 @@ def _build_judge(api_key: str):
         elif judge_model == "gemini":
             from langchain_google_genai import ChatGoogleGenerativeAI
 
-            model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash" ).strip()
+            model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite").strip()
 
             print(f"  Using Gemini judge: {model_name}")
 
@@ -98,7 +98,8 @@ def _build_judge(api_key: str):
                 google_api_key=api_key,
                 temperature=0,
                 timeout=120,
-                max_retries=3,convert_system_message_to_human=True
+                max_retries=3,
+                convert_system_message_to_human=True,
             )
 
         elif judge_model == "openai":
@@ -120,17 +121,29 @@ def _build_judge(api_key: str):
             from langchain_groq import ChatGroq
 
             model_name = os.getenv(
-                "GROQ_MODEL", "openai/gpt-oss-20b"
+                "GROQ_MODEL", "llama-3.1-8b-instant"
             ).strip()
 
             print(f"  Using Groq judge: {model_name}")
 
-            llm = ChatGroq(
+            # Groq rejects any request where n > 1. Ragas requests n=3 for some metrics.
+            # SafeChatGroq intercepts and enforces n=1 so Groq API calls never crash.
+            class SafeChatGroq(ChatGroq):
+                def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+                    kwargs.pop("n", None)
+                    return super()._generate(messages, stop=stop, run_manager=run_manager, n=1, **kwargs)
+
+                async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+                    kwargs.pop("n", None)
+                    return super()._agenerate(messages, stop=stop, run_manager=run_manager, n=1, **kwargs)
+
+            llm = SafeChatGroq(
                 model=model_name,
                 api_key=api_key,
                 temperature=0,
                 timeout=120,
                 max_retries=3,
+                n=1,
             )
 
         else:
@@ -182,9 +195,16 @@ def _extract_score(result, name: str) -> float:
 def main():
     args = parse_args()
 
+    judge_name = os.getenv("JUDGE_MODEL", "gemini").strip()
+    judge_detail = (
+        os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite") if judge_name == "gemini"
+        else os.getenv("GROQ_MODEL", "llama-3.1-8b-instant") if judge_name == "groq"
+        else os.getenv("OPENROUTER_MODEL", "gpt-4o-mini") if judge_name == "openrouter"
+        else os.getenv("OPENAI_MODEL", "gpt-4o")
+    )
     console.print(Panel.fit(
         "[bold blue]🔬 RAGAS Evaluation — Fine-Tuned vs. RAG[/bold blue]\n"
-        f"[dim]Judge: {os.getenv('GROQ_MODEL')}  |  Embeddings: {EMBED_MODEL} (local)[/dim]"
+        f"[dim]Judge: {judge_name} ({judge_detail})  |  Embeddings: {EMBED_MODEL} (local)[/dim]"
     ))
 
     test_path = Path(args.test_data)
