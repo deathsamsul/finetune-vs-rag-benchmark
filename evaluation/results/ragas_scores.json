@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-10-30T10:28:18.000000",
+  "n_samples": 50,
+  "scores": {
+    "finetuned": {
+      "faithfulness": 0.266,
+      "answer_relevancy": 0.524
+    },
+    "rag": {
+      "faithfulness": 0.078,
+      "answer_relevancy": 0.546,
+      "context_precision": 0.750
+    }
+  },
+  "config": {
+    "finetuned_model": "./checkpoints/medquad-lora",
+    "rag_index": "./indexes/medquad_faiss",
+    "metrics": [
+      "faithfulness",
+      "answer_relevancy",
+      "context_precision"
+    ],
+    "k": 4,
+    "judge": "groq",
+    "embeddings": "sentence-transformers/all-MiniLM-L6-v2"
+  }
+}
+

@@ -25,6 +25,16 @@
 > ⚠️ Faithfulness uses different context sources — see [Limitations](#-limitations) and [Experiment Report](docs/EXPERIMENT_REPORT.md)  
 > *50 samples evaluated from held-out test set · Judge: Groq · Full results: `evaluation/results/ragas_scores.json`*
 
+### 📊 Benchmark Visualizations
+
+| Aggregate Metric Comparison | Score Delta (Fine-Tuned vs RAG) |
+|:---:|:---:|
+| ![Aggregate Metric Comparison](evaluation/results/visualizations/aggregate_metric_comparison.png) | ![Score Delta](evaluation/results/visualizations/score_delta.png) |
+
+| Per-Sample Score Comparison | Latency Comparison |
+|:---:|:---:|
+| ![Per-Sample Score Comparison](evaluation/results/visualizations/per_sample_score_comparison.png) | ![Latency Comparison](evaluation/results/visualizations/latency_comparison.png) |
+
 ---
 
 ## 🏗️ Architecture
