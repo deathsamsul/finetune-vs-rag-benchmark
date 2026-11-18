@@ -59,11 +59,14 @@ def download_dataset(dataset_name: str, hf_token: str | None) -> list[dict]:
 
     console.print(f"  Downloading: [bold]{dataset_name}[/bold]")
 
+    # Pass token only if it's actually set (empty string causes auth errors)
+    token = hf_token if hf_token else None
+
     try:
-        ds = load_dataset(dataset_name, token=hf_token, split="train")
+        ds = load_dataset(dataset_name, token=token, split="train")
     except Exception as e:
         console.print(f"  [yellow]Primary dataset failed ({e}), trying fallback...[/yellow]")
-        ds = load_dataset(HF_FALLBACK, token=hf_token, split="train")
+        ds = load_dataset(HF_FALLBACK, token=token, split="train")
 
     # Normalise column names — different datasets use different names
     samples = []
@@ -183,7 +186,7 @@ def main():
         "[dim]Downloading, cleaning, and splitting the dataset[/dim]" ))
 
 
-    hf_token = os.getenv("HF_TOKEN")
+    hf_token = os.getenv("HF_TOKEN", "").strip() or None
     if not hf_token:
         console.print("[yellow]Warning: HF_TOKEN not set. Some datasets may be inaccessible.[/yellow]")
 
