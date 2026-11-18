@@ -77,20 +77,27 @@ def _build_local_judge(cfg: "EvalConfig"):
         "trust_remote_code": True,
     }
 
+    # Check if model is already pre-quantized in its config/weights
+    is_pre_quantized = any(tag in model_name.lower() for tag in ["bnb-4bit", "4bit", "awq", "gptq"])
+
     if cfg.judge_load_in_4bit and device != "cpu":
-        console.print("  Loading in 4-bit (bitsandbytes NF4)")
-        model_kwargs["quantization_config"] = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_quant_type="nf4",
-        )
-        model_kwargs["device_map"] = "auto"
+        if is_pre_quantized:
+            console.print("  Pre-quantized model detected — loading via device_map='auto'")
+            model_kwargs["device_map"] = "auto"
+        else:
+            console.print("  Loading in 4-bit (bitsandbytes NF4)")
+            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_quant_type="nf4",
+            )
+            model_kwargs["device_map"] = "auto"
     elif device == "cpu":
-        model_kwargs["torch_dtype"] = torch.float32
+        model_kwargs["dtype"] = torch.float32
         model_kwargs["device_map"] = None
         console.print("  [dim]CPU mode — float32, no quantization[/dim]")
     else:
-        model_kwargs["torch_dtype"] = torch.float16
+        model_kwargs["dtype"] = torch.float16
         model_kwargs["device_map"] = "auto"
 
     # Try loading with Unsloth first (faster), fall back to vanilla transformers
@@ -114,18 +121,30 @@ def _build_local_judge(cfg: "EvalConfig"):
         model.eval()
         console.print("  [dim]Loaded via transformers[/dim]")
 
+    # Avoid max_length vs max_new_tokens conflict warning
+    if hasattr(model, "generation_config") and model.generation_config is not None:
+        model.generation_config.max_length = None
+
     pipeline_kwargs = {}
     if device == "cpu":
         pipeline_kwargs["device"] = -1
+
+    gen_kwargs = {
+        "max_new_tokens": cfg.judge_max_tokens,
+        "return_full_text": False,
+    }
+    # Only set temperature if sampling; avoid warning when do_sample is False
+    if cfg.judge_temperature and cfg.judge_temperature > 0:
+        gen_kwargs["temperature"] = cfg.judge_temperature
+        gen_kwargs["do_sample"] = True
+    else:
+        gen_kwargs["do_sample"] = False
 
     hf_pipe = pipeline(
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=cfg.judge_max_tokens,
-        temperature=cfg.judge_temperature or 0.01,
-        do_sample=cfg.judge_temperature > 0,
-        return_full_text=False,
+        **gen_kwargs,
         **pipeline_kwargs,
     )
 

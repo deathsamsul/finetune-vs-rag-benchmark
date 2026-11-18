@@ -86,7 +86,7 @@ class RAGChain:
             console.print("  [dim]GPU detected — using float16[/dim]")
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
-                torch_dtype=torch.float16,
+                dtype=torch.float16,
                 device_map="auto",
                 token=os.getenv("HF_TOKEN"),
                 low_cpu_mem_usage=True,
@@ -99,7 +99,7 @@ class RAGChain:
             )
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
-                torch_dtype=torch.float32,  # float32 on CPU
+                dtype=torch.float32,  # float32 on CPU
                 device_map=None,      # explicitly None — no disk offload
                 token=os.getenv("HF_TOKEN"),
                 low_cpu_mem_usage=True,
@@ -107,6 +107,10 @@ class RAGChain:
             pipeline_kwargs = {"device": -1}      # -1 = CPU for pipeline()
 
         model.eval()
+
+        # Avoid max_length vs max_new_tokens warning
+        if hasattr(model, "generation_config") and model.generation_config is not None:
+            model.generation_config.max_length = None
 
         hf_pipe = pipeline(
             "text-generation",

@@ -83,13 +83,17 @@ class FineTunedInference:
 
             base = AutoModelForCausalLM.from_pretrained(
                 base_model_name,
-                torch_dtype=dtype,
+                dtype=dtype,
                 device_map=device_map,
                 token=os.getenv("HF_TOKEN"),
                 low_cpu_mem_usage=True,
             )
             model = PeftModel.from_pretrained(base, str(self.checkpoint_dir))
             model.eval()
+
+        # Avoid max_length vs max_new_tokens conflict warning
+        if hasattr(model, "generation_config") and model.generation_config is not None:
+            model.generation_config.max_length = None
 
         self._model = model
         self._tokenizer = tokenizer
