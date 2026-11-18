@@ -1,6 +1,6 @@
 # RAGAS Benchmark Report
 
-Generated: 2026-10-28 05:54
+Generated: 2026-10-30 10:28
 
 ## Setup
 
@@ -16,9 +16,9 @@ Generated: 2026-10-28 05:54
 
 | Metric | Fine-Tuned (QLoRA) | RAG (FAISS) | Winner |
 |---|---|---|---|
-| answer_relevancy | 0.683 | 0.516 | Fine-Tuned |
-| context_precision | N/A | 1.000 | — |
-| faithfulness | 0.179 | 0.322 | RAG |
+| answer_relevancy | 0.524 | 0.546 | RAG |
+| context_precision | N/A | 0.750 | — |
+| faithfulness | 0.266 | 0.078 | Fine-Tuned |
 
 ## Metric Definitions
 

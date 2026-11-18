@@ -33,6 +33,7 @@ langchain
 langchain-community
 langchain-core
 langchain-huggingface
+langchain-text-splitters
 faiss-cpu            # Use faiss-gpu if you have CUDA
 sentence-transformers
 
@@ -40,6 +41,9 @@ sentence-transformers
 ragas
 langchain-openai    # RAGAS uses OpenAI as judge by default
 openai              # Required by RAGAS LLM judge
+langchain-groq      # Groq judge support
+langchain-google-genai  # Gemini judge support
+langchain-openrouter    # OpenRouter judge support
 
 # ── Observability & Tracking ────────────────────────────────
 langfuse
