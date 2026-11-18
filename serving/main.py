@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
     # ── Fine-Tuned model ───────────────────────────────────────────────────────
     checkpoint_dir = os.getenv("CHECKPOINT_DIR", "./checkpoints/medquad-lora")
     try:
-        from evaluation.run_ragas1 import FineTunedInference
+        from utils.fine_tune_inference import FineTunedInference
         state.ft_model = FineTunedInference(checkpoint_dir)
         state.ft_model.load()
         logger.info("Fine-tuned model loaded ✓")
@@ -242,7 +242,7 @@ async def query(req: QueryRequest):
 
         trace_data = {}
         if state.ft_tracer:
-            from evaluation.utils.finetuning.utils import format_for_inference
+            from utils.finetuning.utils import format_for_inference
             prompt_repr = format_for_inference(req.question)
             trace_data = state.ft_tracer.trace_generation(
                 question=req.question,

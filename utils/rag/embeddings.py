@@ -7,6 +7,7 @@ The same embeddings are used for both indexing and query time.
 
 from __future__ import annotations
 from functools import lru_cache
+import torch
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from rich.console import Console
 
@@ -32,9 +33,10 @@ def get_embeddings(model_name: str = EMBEDDING_MODEL) -> HuggingFaceEmbeddings:
     lru_cache(1) ensures the embedding model is only loaded once
     per process — loading is slow (~2s) and the model is large (~80MB).
     """
-    console.print(f"  Loading embedding model: [bold]{model_name}[/bold]")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    console.print(f"  Loading embedding model: [bold]{model_name}[/bold] (device: {device})")
     return HuggingFaceEmbeddings(
         model_name=model_name,
-        model_kwargs={"device": "cuda"},   # change to "cuda" if GPU available
+        model_kwargs={"device": device},
         encode_kwargs={"normalize_embeddings": True},
     )

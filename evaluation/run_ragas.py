@@ -66,12 +66,27 @@ def _build_judge(api_key: str):
     from ragas.llms import LangchainLLMWrapper
 
     judge_model = os.getenv("JUDGE_MODEL", "groq").strip().lower()
-
+    print(f"  Building judge model: {judge_model} ...........")
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
-        if judge_model == "gemini":
+        if judge_model == "openrouter":
+            from langchain_openrouter import ChatOpenRouter
+
+            model_name = os.getenv("OPENROUTER_MODEL", "gpt-4o-mini").strip()
+
+            print(f"  Using OpenRouter judge: {model_name}")
+            api_key = os.getenv("OPENROUTER_API_KEY", api_key).strip()
+            llm = ChatOpenRouter(
+                model=model_name,
+                api_key=api_key,
+                temperature=0,
+                timeout=120,
+                max_retries=3,
+            )
+
+        elif judge_model == "gemini":
             from langchain_google_genai import ChatGoogleGenerativeAI
 
             model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash" ).strip()

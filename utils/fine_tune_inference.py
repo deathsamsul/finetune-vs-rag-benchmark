@@ -53,7 +53,7 @@ class FineTunedInference:
             )
             base = AutoModelForCausalLM.from_pretrained(
                 base_model_name,
-                dtype=torch.float16,
+                torch_dtype=torch.float16,
                 device_map={"": 0},
                 token=os.getenv("HF_TOKEN"),
             )
