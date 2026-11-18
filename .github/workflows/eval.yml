@@ -1,30 +1,19 @@
 # .github/workflows/eval.yml
-# CI: Run RAGAS evaluation on every push to main
-# Uses a small subset (20 samples) to keep CI fast and cheap.
+# CI: Run unit tests on every push and PR
 
-name: RAGAS Evaluation CI
+name: Tests
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'evaluation/**'
-      - 'utils/**'
-      - 'data/**'
   pull_request:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      n_samples:
-        description: 'Number of test samples to evaluate'
-        required: false
-        default: '20'
 
 jobs:
-  evaluate:
-    name: Run RAGAS Benchmark
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -39,47 +28,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          # Install faiss-cpu (not faiss-gpu — GitHub Actions has no GPU)
-          pip install faiss-cpu==1.8.0.post1
+          pip install pytest pytest-asyncio
 
-      - name: Download & prepare data
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      - name: Run tests
         run: |
-          python -m data.prepare_data --max_samples 500
-
-      - name: Build RAG index
-        run: |
-          python -m utils.rag.build_index --max_docs 500
-
-      - name: Run RAGAS evaluation (RAG only — no GPU for fine-tuned)
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          python -m evaluation.run_ragas \
-            --skip_finetuned \
-            --n_samples ${{ github.event.inputs.n_samples || '20' }} \
-            --output evaluation/results/ragas_scores.json
-
-      - name: Upload evaluation results
-        uses: actions/upload-artifact@v4
-        with:
-          name: ragas-results
-          path: |
-            evaluation/results/ragas_scores.json
-            evaluation/results/benchmark_report.md
-          retention-days: 30
-
-      - name: Comment PR with results
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('evaluation/results/benchmark_report.md', 'utf8');
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## 🔬 RAGAS Evaluation Results\n\n${report}`
-            });
+          python -m pytest tests/ -v --tb=short
