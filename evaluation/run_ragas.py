@@ -187,14 +187,19 @@ def main():
         f"[dim]Judge: {os.getenv('GROQ_MODEL')}  |  Embeddings: {EMBED_MODEL} (local)[/dim]"
     ))
 
-    import jsonlines
     test_path = Path(args.test_data)
     if not test_path.exists():
         console.print(f"[red]Test data not found: {test_path}[/red]")
         sys.exit(1)
 
-    with jsonlines.open(test_path) as r:
-        test_samples = list(r)
+    try:
+        import jsonlines
+        with jsonlines.open(test_path) as r:
+            test_samples = list(r)
+    except ImportError:
+        import json
+        with open(test_path, "r", encoding="utf-8") as f:
+            test_samples = [json.loads(line) for line in f if line.strip()]
     if args.n_samples:
         test_samples = test_samples[:args.n_samples]
         console.print(f"  Using [bold]{args.n_samples}[/bold] samples")

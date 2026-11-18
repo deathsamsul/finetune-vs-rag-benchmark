@@ -40,14 +40,19 @@ RESULTS_DIR = Path("evaluation/results")
 
 
 def load_test_samples(path: str, n: int) -> list[dict]:
-    import jsonlines
     p = Path(path)
     if not p.exists():
         console.print(f"[red]Test data not found: {p}[/red]")
         console.print("Run: python data/prepare_data.py")
         sys.exit(1)
-    with jsonlines.open(p) as r:
-        samples = list(r)
+    try:
+        import jsonlines
+        with jsonlines.open(p) as r:
+            samples = list(r)
+    except ImportError:
+        import json
+        with open(p, "r", encoding="utf-8") as f:
+            samples = [json.loads(line) for line in f if line.strip()]
     return samples[:n]
 
 
