@@ -9,8 +9,8 @@ on:
     branches: [main]
     paths:
       - 'evaluation/**'
-      - 'rag/**'
-      - 'finetuning/**'
+      - 'utils/**'
+      - 'data/**'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -46,17 +46,17 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          python data/prepare_data.py --max_samples 500
+          python -m data.prepare_data --max_samples 500
 
       - name: Build RAG index
         run: |
-          python rag/build_index.py --max_docs 500
+          python -m utils.rag.build_index --max_docs 500
 
       - name: Run RAGAS evaluation (RAG only — no GPU for fine-tuned)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          python evaluation/run_ragas.py \
+          python -m evaluation.run_ragas \
             --skip_finetuned \
             --n_samples ${{ github.event.inputs.n_samples || '20' }} \
             --output evaluation/results/ragas_scores.json

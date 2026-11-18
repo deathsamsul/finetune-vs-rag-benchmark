@@ -19,7 +19,7 @@ install:
 
 # ── Data ──────────────────────────────────────────────────────
 data:
-	python data/prepare_data.py
+	python -m data.prepare_data
 
 # ── Day 1: Fine-Tuning ────────────────────────────────────────
 finetune:
