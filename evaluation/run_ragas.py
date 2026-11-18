@@ -65,26 +65,36 @@ def _build_judge(api_key: str):
     import warnings
     from ragas.llms import LangchainLLMWrapper
 
-    judge_model = os.getenv("JUDGE_MODEL", "groq").strip().lower()
+    judge_model = os.getenv("JUDGE_MODEL", "openrouter").strip().strip('"').strip("'").lower()
     print(f"  Building judge model: {judge_model} ...........")
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
         if judge_model == "openrouter":
-            from langchain_openrouter import ChatOpenRouter
-
-            model_name = os.getenv("OPENROUTER_MODEL", "gpt-4o-mini").strip()
-
+            model_name = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b").strip()
             print(f"  Using OpenRouter judge: {model_name}")
             api_key = os.getenv("OPENROUTER_API_KEY", api_key).strip()
-            llm = ChatOpenRouter(
-                model=model_name,
-                api_key=api_key,
-                temperature=0,
-                timeout=120,
-                max_retries=3,
-            )
+            try:
+                from langchain_openrouter import ChatOpenRouter
+                llm = ChatOpenRouter(
+                    model=model_name,
+                    api_key=api_key,
+                    temperature=0,
+                    timeout=120,
+                    max_retries=3,
+                )
+            except ImportError:
+                from langchain_openai import ChatOpenAI
+                base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip()
+                llm = ChatOpenAI(
+                    model=model_name,
+                    api_key=api_key,
+                    base_url=base_url,
+                    temperature=0,
+                    timeout=120,
+                    max_retries=3,
+                )
 
         elif judge_model == "gemini":
             from langchain_google_genai import ChatGoogleGenerativeAI
@@ -146,10 +156,28 @@ def _build_judge(api_key: str):
                 n=1,
             )
 
+        elif judge_model in ("compat", "openai_compatible", "custom"):
+            from langchain_openai import ChatOpenAI
+
+            base_url = os.getenv("JUDGE_BASE_URL", "").strip() or None
+            model_name = os.getenv("JUDGE_MODEL_NAME", "").strip() or os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+            judge_key = os.getenv("JUDGE_API_KEY", "").strip() or api_key or "dummy-key"
+
+            print(f"  Using OpenAI-compatible judge: {model_name} (base_url: {base_url})")
+
+            llm = ChatOpenAI(
+                model=model_name,
+                api_key=judge_key,
+                base_url=base_url,
+                temperature=0,
+                timeout=120,
+                max_retries=3,
+            )
+
         else:
             raise ValueError(
                 f"Unknown JUDGE_MODEL: {judge_model}. "
-                "Choose: gemini, openai, or groq."
+                "Choose: openrouter, gemini, openai, groq, or compat."
             )
 
     return LangchainLLMWrapper(llm)
