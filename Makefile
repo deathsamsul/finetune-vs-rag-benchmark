@@ -1,15 +1,17 @@
-.PHONY: help install data finetune rag-index evaluate serve clean
+.PHONY: help install data finetune rag-index evaluate compare visualize serve clean
 
 # ── Default target ────────────────────────────────────────────
 help:
-	@echo "finetune-vs-rag-medqa — available commands:"
+	@echo "finetune-vs-rag-benchmark — available commands:"
 	@echo ""
 	@echo "  make install      Install all Python dependencies"
 	@echo "  make data         Download & prepare MedQuAD splits"
-	@echo "  make finetune     Run QLoRA fine-tuning (Day 1)"
-	@echo "  make rag-index    Build FAISS RAG index (Day 2)"
-	@echo "  make evaluate     Run RAGAS evaluation on both (Day 2)"
-	@echo "  make serve        Start FastAPI server (Day 3)"
+	@echo "  make finetune     Run QLoRA fine-tuning"
+	@echo "  make rag-index    Build FAISS RAG index"
+	@echo "  make evaluate     Run RAGAS evaluation on both pipelines"
+	@echo "  make compare      Run disagreement analysis between FT and RAG"
+	@echo "  make visualize    Generate publication figures & HTML report"
+	@echo "  make serve        Start FastAPI server"
 	@echo "  make clean        Remove generated artefacts"
 	@echo ""
 
@@ -21,7 +23,7 @@ install:
 data:
 	python -m data.prepare_data
 
-# ── Day 1: Fine-Tuning ────────────────────────────────────────
+# ── Fine-Tuning ───────────────────────────────────────────────
 finetune:
 	python -m utils.finetuning.train_lora \
 		--model unsloth/Llama-3.2-3B-Instruct \
@@ -31,13 +33,13 @@ finetune:
 		--epochs 3 \
 		--output_dir ./checkpoints/medquad-lora
 
-# ── Day 2: RAG Index ──────────────────────────────────────────
+# ── RAG Index ─────────────────────────────────────────────────
 rag-index:
 	python -m utils.rag.build_index \
 		--data_path data/processed/ \
 		--index_path ./indexes/medquad_faiss
 
-# ── Day 2: Evaluation ─────────────────────────────────────────
+# ── Evaluation ────────────────────────────────────────────────
 evaluate:
 	python -m evaluation.run_ragas \
 		--finetuned_model ./checkpoints/medquad-lora \
@@ -46,7 +48,20 @@ evaluate:
 		--metrics faithfulness answer_relevancy context_precision \
 		--output evaluation/results/ragas_scores.json
 
-# ── Day 3: Serve ──────────────────────────────────────────────
+compare:
+	python -m evaluation.compare \
+		--test_data data/processed/test.jsonl \
+		--finetuned_model ./checkpoints/medquad-lora \
+		--rag_index ./indexes/medquad_faiss \
+		--n_samples 50 \
+		--top_n 10
+
+visualize:
+	python -m evaluation.visualize_benchmark \
+		--results-dir evaluation/results \
+		--output-dir evaluation/results/visualizations
+
+# ── Serving ───────────────────────────────────────────────────
 serve:
 	uvicorn serving.main:app --reload --host 0.0.0.0 --port 8000
 

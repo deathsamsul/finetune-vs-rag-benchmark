@@ -1,14 +1,52 @@
+"""
+utils/args.py — CLI argument parsers for all entry points.
+
+Each parser adds judge configuration flags so the user can switch
+providers and models from the terminal without editing Python code.
+
+Priority: CLI args → .env → defaults (handled by EvalConfig).
+"""
+
 import argparse
+import os
 
 
+# ---------------------------------------------------------------------------
+# Shared: adds judge-related arguments to any parser
+# ---------------------------------------------------------------------------
+
+def _add_judge_args(parser: argparse.ArgumentParser):
+    """Add --judge-provider, --judge-model, etc. to a parser."""
+    judge = parser.add_argument_group("Judge configuration")
+    judge.add_argument(
+        "--judge-provider", type=str, default=None,
+        help="Judge provider: local, groq, openrouter, gemini, openai "
+             "(default: JUDGE_PROVIDER env or 'local')",
+    )
+    judge.add_argument(
+        "--judge-model", type=str, default=None,
+        help="Judge model name/path "
+             "(default: JUDGE_MODEL env or provider-specific default)",
+    )
+    judge.add_argument(
+        "--judge-device", type=str, default=None,
+        help="Device for local judge: auto, cpu, cuda (default: auto)",
+    )
+    judge.add_argument(
+        "--judge-temperature", type=float, default=None,
+        help="Judge temperature (default: 0)",
+    )
+    judge.add_argument(
+        "--judge-max-tokens", type=int, default=None,
+        help="Judge max output tokens (default: 1024)",
+    )
+    return parser
 
 
+# ---------------------------------------------------------------------------
+# CLI for run_ragas.py
+# ---------------------------------------------------------------------------
 
-
-
-
-
-#  CLI for run_ragas.py file
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Run RAGAS evaluation on fine-tuned and RAG pipelines",
@@ -24,10 +62,16 @@ def parse_args():
     parser.add_argument("--skip_finetuned",  action="store_true")
     parser.add_argument("--skip_rag",        action="store_true")
     parser.add_argument("--k",               type=int, default=4)
+    parser.add_argument("--batch_size",      type=int, default=8,
+                        help="Batch size for inference")
+    _add_judge_args(parser)
     return parser.parse_args()
 
 
-# cli for build_index.py file 
+# ---------------------------------------------------------------------------
+# CLI for build_index.py
+# ---------------------------------------------------------------------------
+
 def build_index_parse_args():
     parser = argparse.ArgumentParser(
         description="Build FAISS vector index from MedQuAD corpus",
@@ -48,7 +92,10 @@ def build_index_parse_args():
     return parser.parse_args()
 
 
-# cli for fine lora 
+# ---------------------------------------------------------------------------
+# CLI for train_lora.py
+# ---------------------------------------------------------------------------
+
 def fine_tune_parse_args():
     parser = argparse.ArgumentParser(
         description="QLoRA fine-tuning on MedQuAD via Unsloth",
@@ -79,25 +126,28 @@ def fine_tune_parse_args():
     return parser.parse_args()
 
 
+# ---------------------------------------------------------------------------
+# CLI for data preparation
+# ---------------------------------------------------------------------------
 
-# cli for data prepare 
 def data_parse_args():
-    import os 
-    HF_DATASET_NAME=os.getenv('HF_DATASET_NAME',"").strip()
+    HF_DATASET_NAME = os.getenv('HF_DATASET_NAME', "").strip()
 
     parser = argparse.ArgumentParser(description="Prepare MedQuAD dataset splits")
-    parser.add_argument("--max_samples", type=int, default=None, help="Max samples to use (None = all)")
+    parser.add_argument("--max_samples", type=int, default=None,
+                        help="Max samples to use (None = all)")
     parser.add_argument("--train_ratio", type=float, default=0.8)
     parser.add_argument("--val_ratio",   type=float, default=0.1)
     parser.add_argument("--seed",        type=int,   default=42)
     parser.add_argument("--dataset",     type=str,   default=HF_DATASET_NAME,
                         help="HuggingFace dataset name")
-    
     return parser.parse_args()
 
 
+# ---------------------------------------------------------------------------
+# CLI for compare.py
+# ---------------------------------------------------------------------------
 
-# cli for compare.py file 
 def compare_parse_args():
     parser = argparse.ArgumentParser(
         description="Compare fine-tuned vs RAG pipeline on disagreement cases",
@@ -115,4 +165,5 @@ def compare_parse_args():
                         help="Which per-sample metric to rank by")
     parser.add_argument("--output_csv",      type=str,
                         default="evaluation/results/disagreements.csv")
+    _add_judge_args(parser)
     return parser.parse_args()

@@ -1,208 +1,65 @@
 """
 run_ragas.py — RAGAS evaluation for both fine-tuned and RAG pipelines.
-Judge      : gemini-2.0-flash-lite  (GEMINI_API_KEY — free tier, works with v1beta)
-Embeddings : sentence-transformers/all-MiniLM-L6-v2  (local, free, real vectors)
-Why gemini-2.0-flash-lite and not gemini-1.5-flash?
-  langchain-google-genai uses v1beta endpoint. gemini-1.5-flash returns 404
-  NOT_FOUND on v1beta for some free-tier accounts. gemini-2.0-flash-lite works
-  on v1beta free tier and is faster.
-Why local embeddings?
-  Gemini embedding API requires paid tier. all-MiniLM-L6-v2 is already
-  downloaded for the RAG pipeline, runs on CPU, gives real semantic scores.
-Usage:
-    python -m evaluation.run_ragas --n_samples 2    # quick test
-    python -m evaluation.run_ragas --n_samples 100  # full eval
-    python -m evaluation.run_ragas --skip_finetuned # RAG only
+
+Supports dynamic judge selection via CLI or .env:
+
+    # Default local judge (no API key needed)
+    python -m evaluation.run_ragas
+
+    # Local 3B judge
+    python -m evaluation.run_ragas --judge-provider local \
+        --judge-model unsloth/Llama-3.2-3B-Instruct-bnb-4bit
+
+    # Groq cloud judge
+    python -m evaluation.run_ragas --judge-provider groq \
+        --judge-model llama-3.1-8b-instant
+
+    # OpenRouter judge
+    python -m evaluation.run_ragas --judge-provider openrouter \
+        --judge-model openai/gpt-4o-mini
+
+    # Quick test
+    python -m evaluation.run_ragas --n_samples 2
+
 Outputs:
     evaluation/results/ragas_scores.json
     evaluation/results/benchmark_report.md
 """
 
 import json
+import math
 import sys
 import warnings
 from datetime import datetime
 from pathlib import Path
-import os
+
 from dotenv import load_dotenv
+from rich.console import Console
 from rich.panel import Panel
-from utils.fine_tune_inference import FineTunedInference
-from utils.fine_tune_inference import console 
+
+from evaluation.config import EvalConfig
+from evaluation.judge import build_judge, build_embeddings
 from utils.args import parse_args
-from utils.rag_utils import build_ragas_dataset_rag ,run_ragas
-from utils.fine_tune_utils import build_ragas_dataset_finetuned
+from utils.fine_tune_inference import FineTunedInference
 from utils.report_utils import generate_markdown_report, print_results_table
-
-
-
-
-
-# python -m evaluation.run_ragas --n_samples 2
-
-
 
 load_dotenv()
 
-EMBED_MODEL  = os.getenv('EMBED_MODEL',"").strip()
-RESULTS_DIR  = Path("evaluation/results")
+console = Console()
+RESULTS_DIR = Path("evaluation/results")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-
-
-#  RAGAS Core ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# RAGAS metrics
+# ---------------------------------------------------------------------------
 
 def _get_metrics():
+    """Import and return RAGAS metric objects."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         from ragas.metrics import faithfulness, answer_relevancy, context_precision
     return faithfulness, answer_relevancy, context_precision
-
-
-
-def _build_judge(api_key: str):
-    import os
-    import warnings
-    from ragas.llms import LangchainLLMWrapper
-
-    judge_model = os.getenv("JUDGE_MODEL", "openrouter").strip().strip('"').strip("'").lower()
-    print(f"  Building judge model: {judge_model} ...........")
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        if judge_model == "openrouter":
-            model_name = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b").strip()
-            print(f"  Using OpenRouter judge: {model_name}")
-            api_key = os.getenv("OPENROUTER_API_KEY", api_key).strip()
-            try:
-                from langchain_openrouter import ChatOpenRouter
-                llm = ChatOpenRouter(
-                    model=model_name,
-                    api_key=api_key,
-                    temperature=0,
-                    timeout=120,
-                    max_retries=3,
-                )
-            except ImportError:
-                from langchain_openai import ChatOpenAI
-                base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip()
-                llm = ChatOpenAI(
-                    model=model_name,
-                    api_key=api_key,
-                    base_url=base_url,
-                    temperature=0,
-                    timeout=120,
-                    max_retries=3,
-                )
-
-        elif judge_model == "gemini":
-            from langchain_google_genai import ChatGoogleGenerativeAI
-
-            model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite").strip()
-
-            print(f"  Using Gemini judge: {model_name}")
-
-            llm = ChatGoogleGenerativeAI(
-                model=model_name,
-                google_api_key=api_key,
-                temperature=0,
-                timeout=120,
-                max_retries=3,
-                convert_system_message_to_human=True,
-            )
-
-        elif judge_model == "openai":
-            from langchain_openai import ChatOpenAI
-
-            model_name = os.getenv("OPENAI_MODEL", "gpt-4o").strip()
-
-            print(f"  Using OpenAI judge: {model_name}")
-
-            llm = ChatOpenAI(
-                model=model_name,
-                api_key=api_key,
-                temperature=0,
-                timeout=120,
-                max_retries=3,
-            )
-
-        elif judge_model == "groq":
-            from langchain_groq import ChatGroq
-
-            model_name = os.getenv(
-                "GROQ_MODEL", "llama-3.1-8b-instant"
-            ).strip()
-
-            print(f"  Using Groq judge: {model_name}")
-
-            # Groq rejects any request where n > 1. Ragas requests n=3 for some metrics.
-            # SafeChatGroq intercepts and enforces n=1 so Groq API calls never crash.
-            class SafeChatGroq(ChatGroq):
-                def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-                    kwargs.pop("n", None)
-                    return super()._generate(messages, stop=stop, run_manager=run_manager, n=1, **kwargs)
-
-                async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
-                    kwargs.pop("n", None)
-                    return super()._agenerate(messages, stop=stop, run_manager=run_manager, n=1, **kwargs)
-
-            llm = SafeChatGroq(
-                model=model_name,
-                api_key=api_key,
-                temperature=0,
-                timeout=120,
-                max_retries=3,
-                n=1,
-            )
-
-        elif judge_model in ("compat", "openai_compatible", "custom"):
-            from langchain_openai import ChatOpenAI
-
-            base_url = os.getenv("JUDGE_BASE_URL", "").strip() or None
-            model_name = os.getenv("JUDGE_MODEL_NAME", "").strip() or os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
-            judge_key = os.getenv("JUDGE_API_KEY", "").strip() or api_key or "dummy-key"
-
-            print(f"  Using OpenAI-compatible judge: {model_name} (base_url: {base_url})")
-
-            llm = ChatOpenAI(
-                model=model_name,
-                api_key=judge_key,
-                base_url=base_url,
-                temperature=0,
-                timeout=120,
-                max_retries=3,
-            )
-
-        else:
-            raise ValueError(
-                f"Unknown JUDGE_MODEL: {judge_model}. "
-                "Choose: openrouter, gemini, openai, groq, or compat."
-            )
-
-    return LangchainLLMWrapper(llm)
-
-
-
-def _build_embeddings():
-    console.print(f"  Loading embeddings [dim]({EMBED_MODEL})[/dim] ...")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        try:
-            from langchain_huggingface import HuggingFaceEmbeddings
-        except ImportError:
-            from langchain_community.embeddings import HuggingFaceEmbeddings
-
-        from ragas.embeddings import LangchainEmbeddingsWrapper
-
-        hf = HuggingFaceEmbeddings(
-            model_name=EMBED_MODEL,
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True},
-        )
-        return LangchainEmbeddingsWrapper(hf)
-
-
 
 
 def _extract_score(result, name: str) -> float:
@@ -215,27 +72,150 @@ def _extract_score(result, name: str) -> float:
     return float(val) if val is not None else float("nan")
 
 
+# ---------------------------------------------------------------------------
+# Dataset builders
+# ---------------------------------------------------------------------------
+
+def _build_ragas_dataset_finetuned(ft_model, test_samples: list):
+    """Generate answers with the fine-tuned model and build a RAGAS dataset."""
+    from datasets import Dataset
+    from rich.progress import track
+
+    rows = []
+    for sample in track(test_samples, description="  Fine-tuned inference..."):
+        try:
+            r = ft_model.generate(sample["question"])
+            rows.append({
+                "question":     sample["question"],
+                "answer":       r["answer"],
+                "contexts":     [sample["answer"]],
+                "ground_truth": sample["answer"],
+            })
+        except Exception as e:
+            console.print(f"  [yellow]FT error: {e}[/yellow]")
+            rows.append({
+                "question": sample["question"], "answer": "",
+                "contexts": [""], "ground_truth": sample["answer"],
+            })
+    return Dataset.from_list(rows)
 
 
+def _build_ragas_dataset_rag(rag_chain, test_samples: list):
+    """Generate answers with the RAG pipeline and build a RAGAS dataset."""
+    from datasets import Dataset
+    from rich.progress import track
 
-#  Main ----------------------------------------------------------------
+    rows = []
+    for sample in track(test_samples, description="  RAG inference..."):
+        try:
+            r = rag_chain.query(sample["question"])
+            rows.append({
+                "question":     sample["question"],
+                "answer":       r["answer"],
+                "contexts":     r["contexts"] or [""],
+                "ground_truth": sample["answer"],
+            })
+        except Exception as e:
+            console.print(f"  [yellow]RAG error: {e}[/yellow]")
+            rows.append({
+                "question": sample["question"], "answer": "",
+                "contexts": [""], "ground_truth": sample["answer"],
+            })
+    return Dataset.from_list(rows)
+
+
+# ---------------------------------------------------------------------------
+# RAGAS evaluation runner
+# ---------------------------------------------------------------------------
+
+def _run_ragas(dataset, metrics: list, pipeline_name: str,
+               cfg: EvalConfig, judge, embeddings) -> dict:
+    """
+    Run RAGAS evaluation with the configured judge and local embeddings.
+    Returns {metric_name: float_score}.
+    """
+    faithfulness, answer_relevancy, context_precision = _get_metrics()
+
+    metric_map = {
+        "faithfulness":      faithfulness,
+        "answer_relevancy":  answer_relevancy,
+        "context_precision": context_precision,
+    }
+    selected = [metric_map[m] for m in metrics if m in metric_map]
+
+    # context_precision doesn't apply to fine-tuned (no retrieval step)
+    if pipeline_name == "finetuned" and context_precision in selected:
+        selected.remove(context_precision)
+        console.print("  [dim]context_precision skipped for fine-tuned "
+                       "(no retrieval step)[/dim]")
+
+    console.print(
+        f"  Running RAGAS ({len(selected)} metrics)  "
+        f"[dim]judge: {cfg.summary_str()}  |  embeddings: {cfg.embed_model}[/dim]"
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        from ragas import evaluate
+
+        result = evaluate(
+            dataset,
+            metrics=selected,
+            llm=judge,
+            embeddings=embeddings,
+            raise_exceptions=False,
+        )
+
+    scores = {}
+    has_failure = False
+    for metric in selected:
+        key = metric.name
+        score = _extract_score(result, key)
+
+        if math.isnan(score):
+            has_failure = True
+            console.print(
+                f"  [yellow]⚠  {key} = NaN — judge ({cfg.summary_str()}) "
+                f"failed to score this metric.[/yellow]"
+            )
+            # Store NaN, NOT zero — caller must handle it
+            scores[key] = float("nan")
+        else:
+            console.print(f"  [green]✓[/green]  {key} = [bold]{score:.3f}[/bold]")
+            scores[key] = score
+
+    if has_failure:
+        console.print(
+            "  [yellow]Some metrics returned NaN. Check the judge provider "
+            "and API key/quota.[/yellow]"
+        )
+
+    return scores
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main():
     args = parse_args()
+    cfg = EvalConfig.from_env_and_args(args)
 
-    judge_name = os.getenv("JUDGE_MODEL", "gemini").strip()
-    judge_detail = (
-        os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite") if judge_name == "gemini"
-        else os.getenv("GROQ_MODEL", "llama-3.1-8b-instant") if judge_name == "groq"
-        else os.getenv("OPENROUTER_MODEL", "gpt-4o-mini") if judge_name == "openrouter"
-        else os.getenv("OPENAI_MODEL", "gpt-4o")
-    )
+    # Validate config
+    errors = cfg.validate()
+    if errors:
+        for e in errors:
+            console.print(f"[red]✗ {e}[/red]")
+        sys.exit(1)
+
     console.print(Panel.fit(
         "[bold blue]🔬 RAGAS Evaluation — Fine-Tuned vs. RAG[/bold blue]\n"
-        f"[dim]Judge: {judge_name} ({judge_detail})  |  Embeddings: {EMBED_MODEL} (local)[/dim]"
+        f"[dim]Judge: {cfg.summary_str()}  |  "
+        f"Embeddings: {cfg.embed_model} (local)[/dim]"
     ))
 
-    test_path = Path(args.test_data)
+    # Load test data
+    test_path = Path(cfg.test_data)
     if not test_path.exists():
         console.print(f"[red]Test data not found: {test_path}[/red]")
         sys.exit(1)
@@ -245,61 +225,70 @@ def main():
         with jsonlines.open(test_path) as r:
             test_samples = list(r)
     except ImportError:
-        import json
         with open(test_path, "r", encoding="utf-8") as f:
             test_samples = [json.loads(line) for line in f if line.strip()]
-    if args.n_samples:
-        test_samples = test_samples[:args.n_samples]
-        console.print(f"  Using [bold]{args.n_samples}[/bold] samples")
+
+    if cfg.n_samples:
+        test_samples = test_samples[:cfg.n_samples]
+        console.print(f"  Using [bold]{cfg.n_samples}[/bold] samples")
     console.print(f"  Test samples: [bold]{len(test_samples):,}[/bold]")
+
+    # Build judge and embeddings ONCE — reused across both pipelines
+    judge = build_judge(cfg)
+    embeddings = build_embeddings(cfg)
 
     results = {}
 
-    #  Fine-Tuned ----------------------------------------------
-    if not args.skip_finetuned:
+    # --- Fine-Tuned pipeline ---
+    if not cfg.skip_finetuned:
         console.print("\n[bold]━━ Fine-Tuned Pipeline (QLoRA) ━━[/bold]")
         try:
-            ft = FineTunedInference(args.finetuned_model)
+            ft = FineTunedInference(cfg.finetuned_model)
             ft.load()
-            ds = build_ragas_dataset_finetuned(ft, test_samples)
-            results["finetuned"] = run_ragas(
-                ds, args.metrics, "finetuned",_get_metrics,_build_judge,_build_embeddings,_extract_score
-                )
+            ds = _build_ragas_dataset_finetuned(ft, test_samples)
+            results["finetuned"] = _run_ragas(
+                ds, cfg.metrics, "finetuned", cfg, judge, embeddings
+            )
         except FileNotFoundError as e:
             console.print(f"  [yellow]Skipping: {e}[/yellow]")
             results["finetuned"] = {}
 
-        # Release the fine-tuned model's VRAM before the RAG pipeline loads its own copy
-        import gc, torch
+        # Release VRAM before RAG pipeline
+        import gc
+        import torch
         if "ft" in locals():
             del ft
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    #  RAG ---------------------------------------------------------------
-    if not args.skip_rag:
+    # --- RAG pipeline ---
+    if not cfg.skip_rag:
         console.print("\n[bold]━━ RAG Pipeline (FAISS + LangChain) ━━[/bold]")
         try:
             from utils.rag.rag_chain import RAGChain
-            # Pass local checkpoint path to avoid re-downloading 5.5GB
             rag_chain = RAGChain(
-                index_path=args.rag_index,
-                model_name=str(Path(args.finetuned_model).resolve()),
-                k=args.k,
+                index_path=cfg.rag_index,
+                model_name=str(Path(cfg.finetuned_model).resolve()),
+                k=cfg.k,
             )
             rag_chain.load()
-            ds = build_ragas_dataset_rag(rag_chain, test_samples)
-            results["rag"] = run_ragas(ds, args.metrics, "rag",_get_metrics,_build_judge,_build_embeddings,_extract_score)
+            ds = _build_ragas_dataset_rag(rag_chain, test_samples)
+            results["rag"] = _run_ragas(
+                ds, cfg.metrics, "rag", cfg, judge, embeddings
+            )
         except FileNotFoundError as e:
             console.print(f"  [yellow]Skipping: {e}[/yellow]")
             results["rag"] = {}
 
-    #  Save -----------------------------------------------------------------
+    # --- Save results ---
     console.print()
     print_results_table(results)
 
-    output_path = Path(args.output)
+    # Check if we have enough valid results to declare winners
+    _check_result_validity(results)
+
+    output_path = Path(cfg.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
         json.dump({
@@ -307,23 +296,35 @@ def main():
             "n_samples":  len(test_samples),
             "scores":     results,
             "config": {
-                "finetuned_model": args.finetuned_model,
-                "rag_index":       args.rag_index,
-                "metrics":         args.metrics,
-                "k":               args.k,
-                "judge":           os.getenv("JUDGE_MODEL", "").strip(),
-                "embeddings":      EMBED_MODEL,
+                "finetuned_model": cfg.finetuned_model,
+                "rag_index":       cfg.rag_index,
+                "metrics":         cfg.metrics,
+                "k":               cfg.k,
+                "judge_provider":  cfg.judge_provider,
+                "judge_model":     cfg.judge_model,
+                "embeddings":      cfg.embed_model,
             },
         }, f, indent=2)
     console.print(f"\n  [green]✓ Scores saved: {output_path}[/green]")
 
-    generate_markdown_report(results, RESULTS_DIR / "benchmark_report.md")
+    generate_markdown_report(results, RESULTS_DIR / "benchmark_report.md", cfg)
 
     console.print(Panel.fit(
         "[bold green]✓ Evaluation complete![/bold green]\n\n"
         f"Scores : [bold]{output_path}[/bold]\n"
         f"Report : [bold]{RESULTS_DIR / 'benchmark_report.md'}[/bold]"
     ))
+
+
+def _check_result_validity(results: dict):
+    """Warn if results contain NaN — don't declare a winner from invalid data."""
+    for pipeline, scores in results.items():
+        for metric, value in scores.items():
+            if isinstance(value, float) and math.isnan(value):
+                console.print(
+                    f"  [yellow]⚠ {pipeline}/{metric} is NaN — "
+                    f"this result is invalid and should not be compared.[/yellow]"
+                )
 
 
 if __name__ == "__main__":

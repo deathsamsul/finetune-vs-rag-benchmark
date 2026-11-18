@@ -1,18 +1,28 @@
+"""
+utils/rag_utils.py — RAG-specific RAGAS dataset builder.
+
+The build_ragas_dataset_rag function generates answers via the RAG
+pipeline and packages them into a RAGAS-compatible dataset.
+
+The run_ragas function is now a thin wrapper that delegates to
+evaluation.run_ragas._run_ragas — the judge factory and config
+live in evaluation/judge.py and evaluation/config.py.
+
+This file is kept for backward compatibility with existing imports.
+"""
+
 from pathlib import Path
-from utils.fine_tune_inference import  console
+from rich.console import Console
 from rich.progress import track
 import warnings
-import os
 
+console = Console()
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "").strip()
-EMBED_MODEL  = os.getenv('EMBED_MODEL',"").strip()
-
-
-#  RAGAS Dataset Builders ----------------------
 
 def build_ragas_dataset_rag(rag_chain, test_samples: list):
+    """Generate answers with RAG and build a RAGAS-compatible dataset."""
     from datasets import Dataset
+
     rows = []
     for sample in track(test_samples, description="  RAG inference..."):
         try:
@@ -25,101 +35,8 @@ def build_ragas_dataset_rag(rag_chain, test_samples: list):
             })
         except Exception as e:
             console.print(f"  [yellow]RAG error: {e}[/yellow]")
-            rows.append({"question": sample["question"], "answer": "",
-                         "contexts": [""], "ground_truth": sample["answer"]})
+            rows.append({
+                "question": sample["question"], "answer": "",
+                "contexts": [""], "ground_truth": sample["answer"],
+            })
     return Dataset.from_list(rows)
-
-
-
-
-
-# run ragas 
-def run_ragas(dataset, metrics: list, pipeline_name: str ,get_metrics,build_judge,build_embeddings,extract_score) -> dict:
-    """
-    Run RAGAS evaluation with Gemini judge + local embeddings.
-    Returns {metric_name: float_score}.
-    """
-    import os
-    from dotenv import load_dotenv
-    load_dotenv()
-
-
-    # Validate key
-    # api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    # if not api_key:
-    #     console.print("[red]GEMINI_API_KEY not set in .env[/red]")
-    #     console.print("  Free key: https://aistudio.google.com/app/apikey")
-    #     raise SystemExit(1)
-
-    
-    # Validate API key based on chosen judge
-    judge_model = os.getenv("JUDGE_MODEL", "openrouter").strip().strip('"').strip("'").lower()
-    if judge_model == "gemini":
-        api_key = os.getenv("GEMINI_API_KEY", "").strip()
-        key_name = "GEMINI_API_KEY"
-    elif judge_model == "openrouter":
-        api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-        key_name = "OPENROUTER_API_KEY"
-    elif judge_model == "openai":
-        api_key = os.getenv("OPENAI_API_KEY", "").strip()
-        key_name = "OPENAI_API_KEY"
-    elif judge_model in ("compat", "openai_compatible", "custom"):
-        api_key = os.getenv("JUDGE_API_KEY", "").strip() or os.getenv("OPENAI_API_KEY", "").strip() or "dummy"
-        key_name = "JUDGE_API_KEY"
-    else:
-        api_key = os.getenv("GROQ_API_KEY", "").strip()
-        key_name = "GROQ_API_KEY"
-
-    if not api_key:
-        console.print(f"[red]{key_name} not set in environment[/red]")
-        raise SystemExit(1)
-
-
-    faithfulness, answer_relevancy, context_precision = get_metrics()
-
-    metric_map = {
-        "faithfulness":      faithfulness,
-        "answer_relevancy":  answer_relevancy,
-        "context_precision": context_precision,
-    }
-    selected = [metric_map[m] for m in metrics if m in metric_map]
-
-    if pipeline_name == "finetuned" and context_precision in selected:
-        selected.remove(context_precision)
-        console.print("  [dim]context_precision skipped for fine-tuned "
-                    "(no retrieval step)[/dim]")
-
-    judge      = build_judge(api_key)
-    embeddings = build_embeddings()
-
-    console.print(
-        f"  Running RAGAS ({len(selected)} metrics)  "
-        f"[dim]judge: {GROQ_MODEL}  |  embeddings: {EMBED_MODEL}[/dim]"
-    )
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        from ragas import evaluate
-
-        result = evaluate(
-            dataset,
-            metrics=selected,
-            llm=judge,
-            embeddings=embeddings,
-            raise_exceptions=False,
-        )
-
-    scores = {}
-    for metric in selected:
-        key   = metric.name
-        score = extract_score(result, key)
-        if score != score:  # NaN check
-            console.print(
-                f"  [yellow]⚠  {key} = NaN — judge failed. "
-                f"Check GEMINI_API_KEY quota at aistudio.google.com[/yellow]"
-            )
-        else:
-            console.print(f"  [green]✓[/green]  {key} = [bold]{score:.3f}[/bold]")
-        scores[key] = score
-
-    return scores

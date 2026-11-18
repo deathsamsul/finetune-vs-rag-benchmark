@@ -8,7 +8,10 @@ The same embeddings are used for both indexing and query time.
 from __future__ import annotations
 from functools import lru_cache
 import torch
-from langchain_community.embeddings import HuggingFaceEmbeddings
+try:
+    from langchain_huggingface import HuggingFaceEmbeddings
+except ImportError:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
 from rich.console import Console
 
 console = Console()

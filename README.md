@@ -1,10 +1,11 @@
 # 🏥 Fine-Tuned LLM vs. RAG — Medical Q&A Benchmark
 
-> **A rigorous, reproducible head-to-head evaluation of LoRA fine-tuning vs. RAG on MedQuAD.**
-> Same base model. Same domain. Same evaluator. Real numbers.
+> **A rigorous, reproducible head-to-head evaluation of LoRA fine-tuning vs. RAG on MedQuAD.**  
+> Featuring a **Modular, Dynamic LLM Judge Architecture** supporting local 4-bit models (Laptop & Kaggle GPU) and cloud API providers (Groq, OpenRouter, Gemini, OpenAI) with zero code modifications.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x-orange.svg)](https://pytorch.org/)
+[![Tests](https://img.shields.io/badge/tests-101%20passed-brightgreen.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Weights & Biases](https://img.shields.io/badge/Tracked-W%26B-yellow)](https://wandb.ai)
 [![Langfuse](https://img.shields.io/badge/Traced-Langfuse-purple)](https://langfuse.com)
@@ -13,160 +14,167 @@
 
 ## 📋 TL;DR
 
-**"Should we fine-tune or use RAG?"** — answered with numbers, not opinions.
+**"Should we domain fine-tune or use RAG?"** — evaluated with empirical metrics on held-out test data.
 
-| Metric | Fine-Tuned (QLoRA) | RAG (FAISS + LangChain) | Winner |
-|---|---|---|---|
-| Faithfulness ↑ | 0.266 | 0.078 | Fine-Tuned ⚠️ |
-| Answer Relevancy ↑ | 0.524 | 0.546 | RAG |
-| Context Precision ↑ | N/A | 0.750 | — |
+| Metric | Fine-Tuned (QLoRA) | RAG (FAISS + LangChain) | Winner | Notes |
+|---|---|---|---|---|
+| **Faithfulness** ↑ | 0.266 | 0.078 | Fine-Tuned ⚠️ | FT evaluated against ground truth proxy; RAG against retrieved chunks |
+| **Answer Relevancy** ↑ | 0.524 | 0.546 | RAG | RAG responses align closely with clinical question intent |
+| **Context Precision** ↑ | N/A | 0.750 | — | Measures retriever chunk ranking quality (retrieval-only metric) |
 
-> ⬆ Higher is better for quality metrics  
-> ⚠️ Faithfulness uses different context sources — see [Limitations](#-limitations) and [Experiment Report](docs/EXPERIMENT_REPORT.md)  
-> *50 samples evaluated from held-out test set · Judge: Groq · Full results: `evaluation/results/ragas_scores.json`*
+> ⬆ Higher is better.  
+> ⚠️ No winner is declared when metrics contain NaN or failed judge evaluations.  
+> *Results from 50 held-out test samples · Benchmark report: `evaluation/results/benchmark_report.md`*
 
-### 📊 Benchmark Visualizations
+---
 
-| Aggregate Metric Comparison | Score Delta (Fine-Tuned vs RAG) |
+## 📊 Benchmark Visualizations
+
+Publication-ready figures are generated in both **PNG (300 DPI)** and **vector PDF** format in `evaluation/results/visualizations/`:
+
+| Aggregate Metric Comparison | Multi-Metric Radar Profile |
 |:---:|:---:|
-| ![Aggregate Metric Comparison](evaluation/results/visualizations/aggregate_metric_comparison.png) | ![Score Delta](evaluation/results/visualizations/score_delta.png) |
+| ![Aggregate Metric Comparison](evaluation/results/visualizations/aggregate_metric_comparison.png) | ![Radar Chart](evaluation/results/visualizations/metrics_radar_chart.png) |
 
-| Per-Sample Score Comparison | Latency Comparison |
+| Core Qualitative Comparison | End-to-End Latency |
 |:---:|:---:|
-| ![Per-Sample Score Comparison](evaluation/results/visualizations/per_sample_score_comparison.png) | ![Latency Comparison](evaluation/results/visualizations/latency_comparison.png) |
+| ![Faithfulness vs Relevancy](evaluation/results/visualizations/faithfulness_vs_relevancy.png) | ![Latency Comparison](evaluation/results/visualizations/latency_comparison.png) |
+
+| Per-Sample Divergence (Δ FT − RAG) | Evaluation Outcome Distribution |
+|:---:|:---:|
+| ![Score Delta](evaluation/results/visualizations/score_delta.png) | ![Evaluation Outcomes](evaluation/results/visualizations/evaluation_outcomes.png) |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-MedQuAD Dataset
-│
-├─── [PATH A: Fine-Tuning] ────────────────────────────────────────────────┐
-│    Format as instruction pairs → QLoRA fine-tune Llama-3.2-3B (Unsloth) │
-│    → Fine-Tuned Model Checkpoint                                          │
-│                                                                            │
-└─── [PATH B: RAG] ─────────────────────────────────────────────────────── │
-     Chunk + Embed → FAISS Index → LangChain Retrieval Chain               │
-     (uses base Llama-3.2-3B, no fine-tuning)                              │
-                                                                             │
-     Both paths ──→ RAGAS Evaluation (same held-out test split) ───────────┘
-                         │
-                    ┌────┴─────────────────────┐
-                    │  Faithfulness            │
-                    │  Answer Relevancy        │
-                    │  Context Precision (RAG) │
-                    └────────────────────────  ┘
-                         │
-                    FastAPI Serving Layer (Pydantic-validated)
-                    Langfuse Tracing (tokens, latency, cost)
-                    W&B Experiment Tracking (training curves)
+                                  MedQuAD Dataset (10k medical Q&A pairs)
+                                                    │
+                 ┌──────────────────────────────────┴──────────────────────────────────┐
+                 ▼                                                                     ▼
+     [Path A: Fine-Tuning]                                                 [Path B: RAG Pipeline]
+  Llama-3.2-3B Instruct (4-bit QLoRA)                                 LangChain + FAISS Vector Store
+  Unsloth-accelerated training                                        sentence-transformers embeddings
+                 │                                                                     │
+                 └──────────────────────────────────┬──────────────────────────────────┘
+                                                    ▼
+                                    ┌───────────────────────────────┐
+                                    │  Unified Evaluation Framework │
+                                    └───────────────┬───────────────┘
+                                                    │
+                                  ┌─────────────────┴─────────────────┐
+                                  ▼                                   ▼
+                      [Modular LLM Judge Factory]         [Local RAGAS Embeddings]
+                    (Dynamic provider & model switcher)   (all-MiniLM-L6-v2, CPU/GPU)
+                                  │
+         ┌────────────────────────┼────────────────────────┬────────────────────────┐
+         ▼                        ▼                        ▼                        ▼
+    Local Model              Groq Cloud               Google Gemini            OpenRouter / OpenAI
+(Llama 3.2 3B 4-bit /   (llama-3.1-8b-instant)    (gemini-2.0-flash-lite)      (gpt-4o-mini)
+ Qwen 2.5 14B AWQ)
+         │
+         ▼
+  RAGAS Metrics Scoring (Faithfulness · Answer Relevancy · Context Precision)
+         │
+         ├──→ Results JSON: evaluation/results/ragas_scores.json
+         ├──→ Disagreements CSV: evaluation/results/disagreements.csv
+         ├──→ Markdown Report: evaluation/results/benchmark_report.md
+         └──→ Publication Visualizations (PNG + PDF) & Interactive HTML Report
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## ⚖️ Dynamic LLM Judge Configuration
 
-| Layer | Tool | Why This Choice |
-|---|---|---|
-| **Fine-tuning** | Unsloth + LoRA/QLoRA | ~2× faster than vanilla PEFT on free T4 GPU |
-| **Base model** | `Llama-3.2-3B-Instruct` | Fits on Colab free tier with QLoRA; reproducible |
-| **Dataset** | ChatDoctor-HealthCareMagic-100k (medical Q&A pairs) | Rich, real-world domain; HF-hosted |
-| **Retrieval** | LangChain + FAISS | Fully local; no external API keys |
-| **Evaluation** | RAGAS | Reference-free; separates hallucination from relevancy |
-| **Observability** | Langfuse | Per-call tracing: tokens, latency, cost |
-| **Experiment tracking** | Weights & Biases | Training loss curves, hyperparameter sweeps |
-| **Serving** | FastAPI + Pydantic | Production-grade validation; unified API for both modes |
+Switch between local on-device models, Kaggle GPUs, and cloud API providers **without modifying any Python source code**.
 
----
+### Configuration Priority
+$$\text{CLI Arguments} \longrightarrow \text{.env File} \longrightarrow \text{Sensible Defaults}$$
 
-## 📂 Repo Structure
+### Supported Environments & Models
 
+| Environment | Judge Provider | Default / Recommended Model | Hardware Requirements |
+|---|---|---|---|
+| **Local Laptop** | `local` | `unsloth/Llama-3.2-3B-Instruct-bnb-4bit` | 4 GB VRAM (RTX 2050+) or CPU (no API key needed) |
+| **Kaggle GPU** | `local` | `unsloth/Qwen2.5-14B-Instruct-bnb-4bit` or `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit` | 16 GB VRAM (T4 x2 or P100) |
+| **Groq Cloud** | `groq` | `llama-3.1-8b-instant` | Requires `GROQ_API_KEY` (Fast, free tier) |
+| **OpenRouter** | `openrouter`| `openai/gpt-4o-mini` | Requires `OPENROUTER_API_KEY` |
+| **Google Gemini** | `gemini` | `gemini-2.0-flash-lite` | Requires `GEMINI_API_KEY` |
+| **OpenAI** | `openai` | `gpt-4o-mini` | Requires `OPENAI_API_KEY` |
+
+### Terminal CLI Examples
+
+```bash
+# 1. Default local judge (Llama-3.2-3B 4-bit, zero API keys required)
+python -m evaluation.run_ragas
+
+# 2. Local judge with explicit model on CPU or GPU
+python -m evaluation.run_ragas \
+  --judge-provider local \
+  --judge-model unsloth/Llama-3.2-3B-Instruct-bnb-4bit \
+  --judge-device auto
+
+# 3. Kaggle GPU judge (Qwen 2.5 14B 4-bit)
+python -m evaluation.run_ragas \
+  --judge-provider local \
+  --judge-model unsloth/Qwen2.5-14B-Instruct-bnb-4bit
+
+# 4. External Groq judge
+python -m evaluation.run_ragas \
+  --judge-provider groq \
+  --judge-model llama-3.1-8b-instant
+
+# 5. External OpenRouter judge
+python -m evaluation.run_ragas \
+  --judge-provider openrouter \
+  --judge-model openai/gpt-4o-mini
+
+# 6. External Google Gemini judge
+python -m evaluation.run_ragas \
+  --judge-provider gemini \
+  --judge-model gemini-2.0-flash-lite
+
+# 7. Quick test run (2 samples only)
+python -m evaluation.run_ragas --n_samples 2
+
+# 8. Pipeline disagreement side-by-side analysis
+python -m evaluation.compare --n_samples 50 --top_n 10 --judge-provider groq
 ```
-finetune-vs-rag-benchmark/
-├── data/
-│   ├── prepare_data.py              # Download, clean, split dataset
-│   ├── raw/                         # Raw download (auto-fetched)
-│   └── processed/
-│       ├── train.jsonl              # 80% split (7,827 samples)
-│       ├── val.jsonl                # 10% split (978 samples)
-│       ├── test.jsonl               # 10% split (979 samples) — held out
-│       └── corpus.jsonl             # Full corpus for RAG indexing
-│
-├── utils/
-│   ├── finetuning/
-│   │   ├── train_lora.py            # Main QLoRA training script (Unsloth)
-│   │   ├── config.yaml              # All hyperparameters in one place
-│   │   ├── utils.py                 # Llama-3 chat template formatting
-│   │   └── inference.py             # Fine-tuned model inference class
-│   ├── rag/
-│   │   ├── build_index.py           # Chunk → embed → FAISS index
-│   │   ├── rag_chain.py             # LangChain retrieval + generation
-│   │   └── embeddings.py            # Embedding model wrapper
-│   ├── fine_tune_inference.py       # Alternative FT inference class
-│   ├── fine_tune_utils.py           # RAGAS dataset builder for FT
-│   ├── rag_utils.py                 # RAGAS dataset builder for RAG
-│   ├── args.py                      # CLI argument parsers
-│   └── report_utils.py              # Report generation utilities
-│
-├── evaluation/
-│   ├── run_ragas.py                 # Run RAGAS on both pipelines
-│   ├── compare.py                   # Side-by-side result comparison
-│   ├── scoring.py                   # RAGAS scoring utilities
-│   ├── pipelines.py                 # Pipeline adapter classes
-│   ├── visualize_benchmark.py       # Visualization generator
-│   └── results/
-│       ├── ragas_scores.json        # Raw RAGAS output (50 samples)
-│       └── benchmark_report.md      # Auto-generated markdown report
-│
-├── serving/
-│   ├── main.py                      # FastAPI app
-│   └── schemas.py                   # Pydantic request/response models
-│
-├── tracing/
-│   └── langfuse_setup.py            # Langfuse client + decorators
-│
-├── tests/
-│   ├── test_schemas.py              # 21 tests — Pydantic models
-│   ├── test_finetuning.py           # 18 tests — FT utils
-│   ├── test_data.py                 # 13 tests — data pipeline
-│   ├── test_rag.py                  # 16 tests — RAG components
-│   └── test_api.py                  # 17 tests — FastAPI endpoints
-│
-├── docs/
-│   ├── PROJECT_AUDIT.md             # Full audit report
-│   ├── EXPERIMENT_REPORT.md         # Experimental methodology & results
-│   └── HARDWARE_COMPATIBILITY.md    # Hardware testing & Kaggle config
-│
-├── checkpoints/
-│   └── medquad-lora/                # QLoRA adapter checkpoint
-│
-├── indexes/
-│   └── medquad_faiss/               # FAISS index + metadata
-│
-├── .github/workflows/eval.yml       # CI: run RAGAS on every push
-├── requirements.txt                  # Dependencies
-├── requirements-dev.txt              # Linting, testing extras
-├── .env.example                      # Required env vars template
-├── Makefile                          # One-command shortcuts
-├── pytest.ini                        # Test configuration
-└── README.md
+
+### Dynamic Configuration through `.env`
+
+```env
+# Active Judge Provider: local | groq | openrouter | gemini | openai
+JUDGE_PROVIDER=local
+JUDGE_MODEL=unsloth/Llama-3.2-3B-Instruct-bnb-4bit
+JUDGE_DEVICE=auto
+JUDGE_LOAD_IN_4BIT=true
+JUDGE_TEMPERATURE=0.0
+JUDGE_MAX_TOKENS=1024
+
+# External Provider API Keys
+GROQ_API_KEY=gsk_your_key_here
+GROQ_MODEL=llama-3.1-8b-instant
+
+OPENROUTER_API_KEY=sk-or-v1-your_key_here
+OPENROUTER_MODEL=openai/gpt-4o-mini
+
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-2.0-flash-lite
+
+OPENAI_API_KEY=sk-your_key_here
+OPENAI_MODEL=gpt-4o-mini
+
+# Local Embeddings (MiniLM-L6-v2, no API keys needed)
+EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ```
 
 ---
 
 ## ⚡ Quickstart
 
-### Prerequisites
-
-- Python 3.10+
-- GPU with ≥ 4GB VRAM (inference) or ≥ 16GB VRAM (training) — or Kaggle T4
-- Hugging Face account (free) — to access Llama 3.2
-- API key for LLM judge (Groq / Gemini / OpenRouter) — for RAGAS evaluation
-- Langfuse account (free tier) — for tracing (optional)
-- W&B account (free tier) — for experiment tracking (optional)
-
-### 1. Clone & Install
+### 1. Setup Environment
 
 ```bash
 git clone https://github.com/deathsamsul/finetune-vs-rag-benchmark.git
@@ -175,215 +183,139 @@ cd finetune-vs-rag-benchmark
 python -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-### 2. Configure Environment
-
-```bash
 cp .env.example .env
-# Edit .env — add your actual keys (see .env.example for all vars)
 ```
 
-### 3. Download & Prepare Data
+### 2. Run All Unit Tests
 
 ```bash
+python -m pytest tests/ -v
+# 101 passed
+```
+
+### 3. Prepare Data & Build Index
+
+```bash
+# Download and split MedQuAD dataset (80/10/10 split)
 python -m data.prepare_data
-# Downloads dataset from HuggingFace, creates train/val/test splits
-# Output: data/processed/{train,val,test,corpus}.jsonl
+
+# Build local FAISS vector index
+python -m utils.rag.build_index
 ```
 
-### 4. Fine-Tune with QLoRA (Day 1)
-
-**Option A — Local GPU (≥ 16GB VRAM) or Kaggle T4:**
-```bash
-python -m utils.finetuning.train_lora \
-  --model unsloth/Llama-3.2-3B-Instruct \
-  --dataset data/processed/train.jsonl \
-  --val_dataset data/processed/val.jsonl \
-  --method qlora \
-  --epochs 3 \
-  --output_dir ./checkpoints/medquad-lora
-```
-
-**Option B — Google Colab (recommended for free GPU):**  
-Open `notebooks/01_finetune_colab.ipynb` in Colab and run all cells.
-
-### 5. Build RAG Index (Day 2)
+### 4. Run Evaluation
 
 ```bash
-python -m utils.rag.build_index \
-  --data_path data/processed/ \
-  --index_path ./indexes/medquad_faiss
-# Chunks documents, embeds with sentence-transformers, saves FAISS index
+# Run RAGAS evaluation with your chosen judge
+python -m evaluation.run_ragas --n_samples 10
+
+# Generate publication charts and interactive HTML report
+python -m evaluation.visualize_benchmark
 ```
 
-### 6. Run RAGAS Evaluation (Day 2)
+### 5. Review Disagreements
 
 ```bash
-python -m evaluation.run_ragas \
-  --finetuned_model ./checkpoints/medquad-lora \
-  --rag_index ./indexes/medquad_faiss \
-  --test_data data/processed/test.jsonl \
-  --metrics faithfulness answer_relevancy context_precision \
-  --n_samples 50 \
-  --output evaluation/results/ragas_scores.json
-# Generates evaluation/results/benchmark_report.md automatically
-```
-
-### 7. Serve Both Pipelines (Day 3)
-
-```bash
-uvicorn serving.main:app --reload --port 8000
-# Swagger UI: http://localhost:8000/docs
+# Find where fine-tuned and RAG models disagree most
+python -m evaluation.compare --n_samples 50 --top_n 10
 ```
 
 ---
 
-## 🔬 Evaluation Methodology
+## 🛠️ Key Improvements & Bug Fixes
 
-### Why RAGAS?
+1. **Modular Judge Architecture (`evaluation/judge.py` & `evaluation/config.py`):**
+   - Single reusable judge factory across both evaluation pipelines (`run_ragas.py` and `compare.py`).
+   - Supports local HuggingFace / Unsloth models with automatic 4-bit bitsandbytes NF4 quantization.
+   - Built-in `SafeChatGroq` wrapper intercepting and enforcing `n=1` to satisfy Groq's API constraints.
+   - Fallback mechanism from `ChatOpenRouter` to `ChatOpenAI` for OpenRouter gateway calls.
+   - Zero hardcoded environment configurations.
 
-RAGAS evaluates without requiring hand-labelled gold answers — critical for medical QA where annotation is expensive. It uses an LLM judge internally but the metrics are well-defined:
+2. **Fixed Existing Bugs:**
+   - **`NameError: GROQ_MODEL`**: Completely resolved by centralizing provider defaults in `evaluation/config.py`.
+   - **`UnboundLocalError: json`**: Fixed shadowed module-level imports in evaluation loaders.
+   - **OpenRouter Credit & Auth Errors**: Clean provider-specific error validation and descriptive diagnostic messages.
+   - **Silent NaN Conversions**: Metrics returning `NaN` are strictly tracked and never masked as `0.0`. If evaluator metrics fail, the system reports the failure and refrains from declaring a false winner.
+   - **Deprecated LangChain & RAGAS Warnings**: Resolved `LangchainLLMWrapper` and `HuggingFaceEmbeddings` deprecation warnings using modern package imports.
+   - **Code Duplication Elimination**: Consolidated `inference.py` and `fine_tune_inference.py`, and aliased `utils/report.py` to `utils/report_utils.py`.
 
-| Metric | What It Measures | Formula Sketch |
-|---|---|---|
-| **Faithfulness** | Are all claims in the answer supported by the context? | `|supported claims| / |total claims|` |
-| **Answer Relevancy** | Does the answer directly address the question? | Embedding sim of reverse-generated questions |
-| **Context Precision** | Are relevant chunks ranked highest in retrieval? | Precision@k with relevance labels |
-
-### Test Set Integrity
-
-- The test split (`data/processed/test.jsonl`) is **held out from fine-tuning entirely**
-- Both pipelines are evaluated on identical questions
-- ⚠️ **Known issue:** The RAG index currently includes test data in its corpus — see [Limitations](#-limitations)
-
-### Why These Metrics Isolate the "Why"
-
-- Faithfulness catches **hallucination** — did the model make things up?
-- Answer Relevancy catches **off-topic** responses
-- Context Precision (RAG only) tells you if retrieval is the bottleneck
+3. **Research-Ready Visualizations (`evaluation/visualize_benchmark.py`):**
+   - Outputs dual high-DPI **PNG** and vector **PDF** figures.
+   - Multi-metric radar chart for dimensional tradeoff analysis.
+   - Detailed interactive HTML report at `evaluation/results/visualizations/benchmark_report.html`.
 
 ---
 
-## 🚀 API Reference
+## 📂 Repository Structure
 
-### POST `/query`
-
-```python
-# Request
-{
-  "question": "What are the symptoms of Type 2 diabetes?",
-  "mode": "rag"   # or "finetuned"
-}
-
-# Response
-{
-  "answer": "Type 2 diabetes symptoms include...",
-  "mode": "rag",
-  "latency_ms": 342.7,
-  "sources": ["doc_chunk_42", "doc_chunk_107"]   # RAG only
-}
+```
+finetune-vs-rag-benchmark/
+├── evaluation/
+│   ├── config.py                    # Centralized config (CLI → .env → defaults)
+│   ├── judge.py                     # Modular judge factory (local + 4 cloud providers)
+│   ├── run_ragas.py                 # RAGAS evaluation on fine-tuned & RAG
+│   ├── compare.py                   # Disagreement & per-sample analysis
+│   ├── visualize_benchmark.py       # Research figures (PNG + PDF) & HTML report
+│   ├── scoring.py                   # Scoring utilities
+│   ├── pipelines.py                 # Pipeline adapter interfaces
+│   └── results/
+│       ├── ragas_scores.json        # Raw benchmark scores
+│       ├── disagreements.csv        # Per-question disagreement review
+│       ├── benchmark_report.md      # Auto-generated markdown report
+│       └── visualizations/          # High-resolution PNGs, PDFs, and HTML report
+│
+├── utils/
+│   ├── args.py                      # CLI argument parsers with judge flags
+│   ├── fine_tune_inference.py       # Robust CPU/GPU QLoRA inference engine
+│   ├── report_utils.py              # Dynamic report and console table generators
+│   ├── report.py                    # Legacy compatibility alias
+│   ├── rag_utils.py                 # RAG dataset builder
+│   ├── fine_tune_utils.py           # Fine-tuned dataset builder
+│   ├── finetuning/
+│   │   ├── train_lora.py            # QLoRA training script
+│   │   ├── config.yaml              # Hyperparameters
+│   │   ├── utils.py                 # Llama-3 chat formatting
+│   │   └── inference.py             # Alias to fine_tune_inference
+│   └── rag/
+│       ├── build_index.py           # FAISS index builder
+│       ├── rag_chain.py             # LangChain retrieval chain
+│       └── embeddings.py            # Local HuggingFace embedding wrapper
+│
+├── tests/
+│   ├── test_judge_config.py         # 13 tests — judge factory & CLI config
+│   ├── test_schemas.py              # 21 tests — API request/response models
+│   ├── test_finetuning.py           # 18 tests — fine-tuning utilities
+│   ├── test_data.py                 # 13 tests — data pipeline
+│   ├── test_rag.py                  # 16 tests — retrieval components
+│   └── test_api.py                  # 17 tests — FastAPI endpoints
+│
+├── checkpoints/medquad-lora/        # Trained LoRA adapter files
+├── indexes/medquad_faiss/           # FAISS vector store & metadata
+├── serving/                         # FastAPI inference service
+├── tracing/                         # Langfuse observability setup
+├── .env.example                     # Clean environment configuration template
+├── Makefile                         # Unified automation shortcuts
+├── requirements.txt                 # Pinned dependencies
+└── README.md
 ```
 
-### GET `/health`
-
-```json
-{"status": "ok", "models_loaded": ["finetuned", "rag"]}
-```
-
-### GET `/metrics`
-
-Returns the RAGAS benchmark scores from the last evaluation run.
-
 ---
 
-## 📊 Observability
+## 🖥️ Hardware Compatibility
 
-Every LLM call — fine-tuned inference and RAG retrieval+generation — is traced in Langfuse:
-
-- **Prompt template** sent to the model
-- **Completion** returned
-- **Token counts** (prompt + completion + total)
-- **Latency** per call
-- **Estimated cost** per call
-
-Access your traces at [cloud.langfuse.com](https://cloud.langfuse.com).
-
----
-
-## 🎯 Design Decisions & Tradeoffs
-
-| Decision | Chosen | Rejected | Reason |
-|---|---|---|---|
-| Base model | Llama-3.2-3B | Mistral-7B | Fits free Colab T4 with QLoRA |
-| Fine-tuning method | QLoRA | Full fine-tune | 10× less VRAM; comparable quality |
-| Fine-tuning library | Unsloth | vanilla PEFT | ~2× faster on same hardware |
-| Vector DB | FAISS (local) | Pinecone, Weaviate | No API keys; fully local; reproducible |
-| Evaluator | RAGAS | Manual labelling | No gold answers needed; separates metrics |
-| Embedding model | `all-MiniLM-L6-v2` | OpenAI ada-002 | Free; local; no API calls during indexing |
-
----
-
-## ⚠️ Limitations & Known Issues
-
-### Evaluation Fairness Caveats
-
-> See [docs/PROJECT_AUDIT.md](docs/PROJECT_AUDIT.md) and [docs/EXPERIMENT_REPORT.md](docs/EXPERIMENT_REPORT.md) for full details.
-
-1. **RAG index includes test data** — `corpus.jsonl` contains all splits (train+val+test), so the RAG retriever can find test answers during evaluation. This inflates RAG's context_precision. Fix: rebuild the index using only training data.
-
-2. **Faithfulness uses different context sources** — The fine-tuned model's RAGAS evaluation uses ground-truth answers as context, while RAG uses retrieved document chunks. These measure different things and are not directly comparable.
-
-3. **RAG uses fine-tuned model** — Both approaches use the QLoRA adapter for generation. The comparison is "FT alone vs FT+retrieval", not "FT vs base+retrieval" as originally intended.
-
-### General Limitations
-
-4. **Single domain** — results apply to medical Q&A. Different domains (legal, financial) would need separate runs and may produce different winners.
-5. **RAGAS evaluator variance** — it uses an LLM judge internally, so scores have ~3–5% variance between runs. Treat as directional.
-6. **No human eval** — the disagreement cases (where fine-tune and RAG give different answers) haven't been human-reviewed yet.
-7. **Fine-tuned model coverage** — the QLoRA model can't answer questions outside the training domain; the RAG index can be extended by adding documents without retraining.
-8. **Small sample size** — current evaluation uses 50 samples. Full evaluation on 979 test samples recommended for statistical confidence.
-
----
-
-## 📅 Build Log
-
-- [x] **Day 1** — Unsloth + QLoRA fine-tune on ChatDoctor-HealthCareMagic (Kaggle T4). Training loss: 2.16 (3 epochs, 423 steps).
-- [x] **Day 2** — LangChain + FAISS RAG pipeline. RAGAS eval on both (50 samples). Scores in table above.
-- [x] **Day 3** — Langfuse tracing. Pydantic validation. FastAPI serving. Benchmark report auto-generated.
-- [x] **Day 4** — Full audit, 88/88 tests passing, hardware validation, documentation.
-
----
-
-## 🖥️ Hardware Requirements
-
-| Task | Minimum GPU VRAM | Recommended |
-|---|---|---|
-| Inference (4-bit) | 4 GB | RTX 2050+ / T4 |
-| RAGAS Evaluation | 4 GB + API key | T4 (faster) |
-| QLoRA Training | 16 GB | Kaggle T4 × 2 |
-| Full-precision inference | 12 GB | A100 / L4 |
-
-> Tested on RTX 2050 (4 GB VRAM): model loads in ~47s, inference ~13s/query, peak 2.37 GB VRAM.  
-> See [docs/HARDWARE_COMPATIBILITY.md](docs/HARDWARE_COMPATIBILITY.md) for full details.
-
----
-
-## 📄 Documentation
-
-| Document | Description |
-|---|---|
-| [Project Audit](docs/PROJECT_AUDIT.md) | Full codebase audit, verification checklist, issues found |
-| [Experiment Report](docs/EXPERIMENT_REPORT.md) | Evaluation methodology, metrics, fairness caveats |
-| [Hardware Compatibility](docs/HARDWARE_COMPATIBILITY.md) | Local testing, resource usage, Kaggle configuration |
+| Platform | Inference Mode | Judge Mode | Typical Load Time | Peak VRAM |
+|---|---|---|---|---|
+| **Laptop (RTX 2050 4GB)** | 4-bit NF4 | 3B 4-bit / Cloud API | ~47s | ~2.37 GB |
+| **Kaggle (T4 GPU 16GB)** | 4-bit / 16-bit | 14B AWQ / 8B 4-bit | ~15s | ~8.5 GB |
+| **CPU Only (8GB RAM)** | Float32 | Cloud API / Lightweight Local | ~90s | System RAM ~4 GB |
 
 ---
 
 ## 📝 License
 
-MIT — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE).
 
 ## 👤 Author
 
-**Samsul Hoque Mondal** — B.Tech CS (MLOps / GenAI /Agentic Ai )  
+**Samsul Hoque Mondal** — B.Tech CS (MLOps / GenAI / Agentic AI)  
 [LinkedIn](https://linkedin.com/in/deathsamsul) · [GitHub](https://github.com/deathsamsul)

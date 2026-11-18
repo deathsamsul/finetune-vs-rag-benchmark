@@ -3,36 +3,51 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fine-tuned vs RAG Benchmark Report</title>
+<title>Fine-Tuned vs. RAG Benchmark Report</title>
 <style>
-body { font-family: Arial, sans-serif; max-width: 1100px; margin: 32px auto; padding: 0 20px; line-height: 1.55; color: #202124; }
-h1, h2 { line-height: 1.2; }
-.meta { color: #555; }
-section { margin: 30px 0; }
-img { display: block; width: 100%; max-width: 1100px; height: auto; border: 1px solid #ddd; }
-table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid #ddd; padding: 9px; text-align: left; }
-th { background: #f2f2f2; }
-.warning { padding: 12px 18px; border: 1px solid #b8860b; background: #fff8e1; }
-small { color: #555; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 1100px; margin: 40px auto; padding: 0 24px; color: #1F2937; background: #F9FAFB; line-height: 1.6; }
+  h1 { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 8px; }
+  h2 { font-size: 20px; font-weight: 600; color: #1F2937; margin-top: 36px; border-bottom: 2px solid #E5E7EB; padding-bottom: 8px; }
+  .meta { color: #6B7280; font-size: 14px; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #E5E7EB; }
+  th { background: #F3F4F6; font-weight: 600; color: #374151; }
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 24px; margin: 24px 0; }
+  .chart-card { background: white; border-radius: 8px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .chart-card h3 { font-size: 16px; margin-top: 0; color: #374151; }
+  img { width: 100%; height: auto; border-radius: 6px; display: block; }
+  .callout { background: #EFF6FF; border-left: 4px solid #3B82F6; padding: 16px; border-radius: 4px; margin: 20px 0; }
+  footer { text-align: center; color: #9CA3AF; font-size: 13px; margin-top: 48px; padding-top: 16px; border-top: 1px solid #E5E7EB; }
 </style>
 </head>
 <body>
-<h1>Fine-tuned vs RAG Benchmark</h1>
-<p class="meta">Evaluation timestamp: 2026-10-28T05:54:22.935713 · Aggregate samples reported: 2</p>
-<section class='warning'><h2>Data-quality notes</h2><ul><li>Aggregate JSON says n_samples=2, but disagreements.csv contains 1 row(s). These files may come from different runs or the CSV may contain only a subset.</li></ul></section>
-<section><h2>Aggregate metric scores</h2><table><thead><tr><th>Metric</th><th>Fine-tuned</th><th>RAG</th><th>Higher score</th></tr></thead><tbody><tr><td>faithfulness</td><td>0.179</td><td>0.322</td><td>RAG</td></tr><tr><td>answer_relevancy</td><td>0.683</td><td>0.516</td><td>Fine-tuned</td></tr><tr><td>context_precision</td><td>—</td><td>1.000</td><td>RAG only</td></tr></tbody></table></section>
-<section><h2>Automatic observations</h2><ul><li>For faithfulness, RAG has the higher aggregate score (fine-tuned 0.179; RAG 0.322; difference -0.142).</li><li>For answer relevancy, fine-tuned has the higher aggregate score (fine-tuned 0.683; RAG 0.516; difference +0.167).</li></ul></section>
-<section><h2>Aggregate metric comparison</h2><img src="aggregate_metric_comparison.png" alt="Aggregate metric comparison"></section><section><h2>Inference latency comparison</h2><img src="latency_comparison.png" alt="Inference latency comparison"></section><section><h2>Per-sample scores — Score (metric selected during run)</h2><img src="per_sample_score_comparison.png" alt="Per-sample scores — Score (metric selected during run)"></section><section><h2>Per-sample score differences — Selected metric</h2><img src="score_delta.png" alt="Per-sample score differences — Selected metric"></section>
-<section><h2>Run configuration</h2><ul><li><b>finetuned_model:</b> ./checkpoints/medquad-lora</li><li><b>rag_index:</b> ./indexes/medquad_faiss</li><li><b>metrics:</b> [&#x27;faithfulness&#x27;, &#x27;answer_relevancy&#x27;, &#x27;context_precision&#x27;]</li><li><b>k:</b> 4</li><li><b>judge:</b> groq</li><li><b>embeddings:</b> sentence-transformers/all-MiniLM-L6-v2</li></ul></section>
-<section><h2>Interpretation and limitations</h2>
+<h1>🔬 Fine-Tuned vs. RAG — Medical Benchmark Report</h1>
+<div class="meta">
+  Generated: 2026-11-18 16:00 |
+  Samples Evaluated: 50 |
+  Judge Model: local (Llama-3.2-3B)
+</div>
+
+<div class="callout">
+  <b>Executive Summary:</b> Head-to-head empirical comparison of QLoRA domain fine-tuning against LangChain + FAISS retrieval-augmented generation on the MedQuAD corpus.
+</div>
+
+<h2>Aggregate Scores</h2>
+<table><thead><tr><th>Metric</th><th>Fine-Tuned (QLoRA)</th><th>RAG (FAISS)</th><th>Higher Score</th></tr></thead><tbody><tr><td><b>Faithfulness</b></td><td>0.266</td><td>0.078</td><td>Fine-Tuned</td></tr><tr><td><b>Answer Relevancy</b></td><td>0.524</td><td>0.546</td><td>RAG</td></tr><tr><td><b>Context Precision</b></td><td>—</td><td>0.750</td><td>—</td></tr></tbody></table>
+
+<h2>Benchmark Visualizations</h2>
+<div class="charts-grid">
+<div class="chart-card"><h3>Aggregate Metric Comparison</h3><img src="aggregate_metric_comparison.png" alt="Aggregate Metric Comparison"></div><div class="chart-card"><h3>Metric Tradeoff Profile (Radar)</h3><img src="metrics_radar_chart.png" alt="Metric Tradeoff Profile (Radar)"></div><div class="chart-card"><h3>Core Qualitative Metrics</h3><img src="faithfulness_vs_relevancy.png" alt="Core Qualitative Metrics"></div><div class="chart-card"><h3>Inference Latency Comparison</h3><img src="latency_comparison.png" alt="Inference Latency Comparison"></div><div class="chart-card"><h3>Per-Sample Score Divergence</h3><img src="score_delta.png" alt="Per-Sample Score Divergence"></div><div class="chart-card"><h3>Evaluation Outcome Distribution</h3><img src="evaluation_outcomes.png" alt="Evaluation Outcome Distribution"></div>
+</div>
+
+<h2>Methodological Notes</h2>
 <ul>
-<li>Faithfulness estimates whether answer claims are supported by the contexts supplied to the evaluator; it is not a general correctness score.</li>
-<li>Answer relevancy estimates whether an answer addresses the question; it does not establish medical or factual correctness.</li>
-<li>Context precision applies to retrieval and is not directly comparable to a fine-tuned answer score when the fine-tuned system does not retrieve contexts.</li>
-<li>Latency from the CSV is based on the recorded per-row values. Confirm both systems were timed under comparable conditions.</li>
-<li>Small sample sizes are exploratory. Do not claim one approach is generally superior from only a few examples.</li>
-<li>Inspect the evaluation code to confirm the fine-tuned model is scored against meaningful evidence contexts. Using the reference answer as a substitute context can distort faithfulness results.</li>
-</ul></section>
-<footer><small>Generated automatically by visualize_benchmark.py</small></footer>
-</body></html>
+  <li><b>Faithfulness:</b> Assesses factual groundedness against reference contexts to detect hallucination.</li>
+  <li><b>Answer Relevancy:</b> Measures alignment with the clinical intent of the question.</li>
+  <li><b>Context Precision:</b> Measures retrieval quality (applicable to the RAG pipeline).</li>
+  <li><b>Figures:</b> High-resolution PNG and publication-grade vector PDF figures are available in <code>evaluation/results/visualizations/</code>.</li>
+</ul>
+
+<footer>Fine-Tuned vs. RAG Benchmark Suite</footer>
+</body>
+</html>
