@@ -51,12 +51,19 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 #  RAGAS Core ------------------------------------------------------------------
-
 def _get_metrics():
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        from ragas.metrics import faithfulness, answer_relevancy, context_precision
-    return faithfulness, answer_relevancy, context_precision
+
+        from ragas.metrics import (faithfulness,answer_relevancy,context_precision,)
+    answer_relevancy.strictness = 1
+
+    return (
+        faithfulness,
+        answer_relevancy,
+        context_precision,)
+
 
 
 
@@ -117,6 +124,15 @@ def _build_judge(api_key: str):
                 timeout=120,
                 max_retries=3,
             )
+
+        elif judge_model == "local":
+            from evaluation.providers.local_provider import (build_local_judge)
+
+            model_name = os.getenv(
+                "LOCAL_JUDGE_MODEL",
+                "Qwen/Qwen2.5-7B-Instruct" ).strip()
+
+            return build_local_judge(model_name)
 
         else:
             raise ValueError(

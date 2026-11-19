@@ -46,6 +46,7 @@ data/processed/
 linkedin_post_draft.md
 note.md
 docs
+test_llm.py
 process.md
 
 # Logs & outputs

@@ -1,15 +1,15 @@
 {
-  "timestamp": "2026-10-28T05:54:22.935713",
+  "timestamp": "2026-11-19T13:33:50.019760",
   "n_samples": 2,
   "scores": {
     "finetuned": {
-      "faithfulness": 0.17914438502673796,
-      "answer_relevancy": 0.6830235565695668
+      "faithfulness": 0.1111111111111111,
+      "answer_relevancy": NaN
     },
     "rag": {
-      "faithfulness": 0.3216374269005848,
-      "answer_relevancy": 0.5156160723252615,
-      "context_precision": 0.9999999999666667
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.43649620860292215,
+      "context_precision": 0.2499999999875
     }
   },
   "config": {
