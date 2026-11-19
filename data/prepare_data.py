@@ -46,7 +46,7 @@ HF_FALLBACK = os.getenv("HF_FALLBACK","medalpaca/medical_meadow_medqa").strip()
 
 
 # python data/prepare.py --max_samples 1000 --train_ratio 0.8 --val_ratio 0.1 --seed 42
-
+# python -m data.prepare_data --max_samples 1000 --train_ratio 0.8 --val_ratio 0.1 --seed 42
 
 
 

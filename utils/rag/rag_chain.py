@@ -91,7 +91,7 @@ class RAGChain:
                 token=os.getenv("HF_TOKEN"),
                 low_cpu_mem_usage=True,
             )
-            pipeline_device = 0
+            pipeline_device = None  # device_map="auto" handles GPU placement for pipeline()
         else:
             # CPU path — do NOT use device_map="auto" (offloads to disk → crash)
             console.print(
@@ -104,7 +104,7 @@ class RAGChain:
                 token=os.getenv("HF_TOKEN"),
                 low_cpu_mem_usage=True,
             )
-            pipeline_device = -1      # -1 = CPU for pipeline()
+            pipeline_device = None  # -1 = CPU for pipeline()
 
         model.eval()
 
@@ -112,7 +112,7 @@ class RAGChain:
             "text-generation",
             model=model,
             tokenizer=tokenizer,
-            device=pipeline_device,   # int only — not a device_map string
+            #device=pipeline_device,   # int only — not a device_map string
             max_new_tokens=512,
             temperature=0.1,
             top_p=0.9,
