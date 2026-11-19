@@ -44,21 +44,36 @@ def run_ragas(dataset, metrics: list, pipeline_name: str ,get_metrics,build_judg
     load_dotenv()
 
 
-    # Validate key
-    # api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    # if not api_key:
-    #     console.print("[red]GEMINI_API_KEY not set in .env[/red]")
-    #     console.print("  Free key: https://aistudio.google.com/app/apikey")
-    #     raise SystemExit(1)
 
-    
-    # Validate Groq API key
-    api_key = os.getenv("GROQ_API_KEY", "").strip()
-    GROQ_MODEL = os.getenv("GROQ_MODEL", "").strip()
-    if not api_key:
-        console.print("[red]GROQ_API_KEY not set in .env[/red]")
-        console.print("  Create a key at: https://console.groq.com/keys")
-        raise SystemExit(1)
+    # Select judge provider and validate API key
+    judge_provider = os.getenv("JUDGE_MODEL", "groq").strip().lower()
+
+    api_key = None
+
+    if judge_provider == "local":
+        console.print("[green]Using local judge — no API key required.[/green]")
+
+    elif judge_provider == "groq":
+        api_key = os.getenv("GROQ_API_KEY", "").strip()
+
+    elif judge_provider == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+
+    elif judge_provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+
+    else:
+        raise ValueError(
+            f"Unsupported JUDGE_MODEL: {judge_provider}. "
+            "Choose: local, groq, gemini, or openai."
+        )
+
+    if judge_provider != "local" and not api_key:
+        raise EnvironmentError(
+            f"{judge_provider.upper()} API key is missing. "
+            f"Set the corresponding API key in your .env file."
+        )
+
 
 
     faithfulness, answer_relevancy, context_precision = get_metrics()
@@ -80,7 +95,7 @@ def run_ragas(dataset, metrics: list, pipeline_name: str ,get_metrics,build_judg
 
     console.print(
         f"  Running RAGAS ({len(selected)} metrics)  "
-        f"[dim]judge: {GROQ_MODEL}  |  embeddings: {EMBED_MODEL}[/dim]"
+        f"[dim]judge: {judge_provider}  |  embeddings: {EMBED_MODEL}[/dim]"
     )
 
     with warnings.catch_warnings():
@@ -102,7 +117,7 @@ def run_ragas(dataset, metrics: list, pipeline_name: str ,get_metrics,build_judg
         if score != score:  # NaN check
             console.print(
                 f"  [yellow]⚠  {key} = NaN — judge failed. "
-                f"Check GEMINI_API_KEY quota at aistudio.google.com[/yellow]"
+                f"Check {judge_provider.upper()}_API_KEY quota at {judge_provider.upper()}_API_KEY[/yellow]"
             )
         else:
             console.print(f"  [green]✓[/green]  {key} = [bold]{score:.3f}[/bold]")

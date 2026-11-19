@@ -72,7 +72,7 @@ def _build_judge(api_key: str):
     import warnings
     from ragas.llms import LangchainLLMWrapper
 
-    judge_model = os.getenv("JUDGE_MODEL", "groq").strip().lower()
+    judge_model = os.getenv("JUDGE_MODEL").strip().lower()
 
 
     with warnings.catch_warnings():
