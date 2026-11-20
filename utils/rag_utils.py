@@ -199,6 +199,13 @@ def run_ragas(
             "(no retrieval step)[/dim]"
         )
 
+    # Free GPU memory before loading judge — the fine-tuned / RAG model
+    # is no longer needed (inference already done), and the judge needs VRAM.
+    import gc, torch
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     # Build judge and embeddings
     judge = build_judge(api_key)
     embeddings = build_embeddings()
@@ -213,14 +220,14 @@ def run_ragas(
     from ragas.run_config import RunConfig
 
     run_config = RunConfig(
-        timeout=300,
-        max_retries=2,
+        timeout=900,
+        max_retries=3,
         max_workers=1,
     )
 
     console.print(
-        "  [dim]Evaluation config: timeout=300s | "
-        "retries=2 | workers=1[/dim]"
+        "  [dim]Evaluation config: timeout=900s | "
+        "retries=3 | workers=1[/dim]"
     )
 
     with warnings.catch_warnings():

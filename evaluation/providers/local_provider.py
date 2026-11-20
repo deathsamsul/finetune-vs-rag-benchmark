@@ -35,9 +35,10 @@ def build_local_judge(model_name: str):
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=1024,
+        max_new_tokens=2048,
         do_sample=False,
         return_full_text=False,
+        batch_size=1,
     )
 
     local_llm = HuggingFacePipeline(
