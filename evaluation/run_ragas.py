@@ -185,7 +185,7 @@ def main():
 
     console.print(Panel.fit(
         "[bold blue]🔬 RAGAS Evaluation — Fine-Tuned vs. RAG[/bold blue]\n"
-        f"[dim]Judge: {os.getenv('GROQ_MODEL')}  |  Embeddings: {EMBED_MODEL} (local)[/dim]"
+        f"[dim]Judge: {os.getenv('LOCAL_JUDGE_MODEL') if os.getenv('JUDGE_MODEL', '').strip().lower() == 'local' else os.getenv('GROQ_MODEL', os.getenv('GEMINI_MODEL', os.getenv('OPENAI_MODEL', 'unknown')))}  |  Embeddings: {EMBED_MODEL} (local)[/dim]"
     ))
 
     import jsonlines
@@ -204,20 +204,18 @@ def main():
     results = {}
 
     #  Fine-Tuned ----------------------------------------------
+    ft_dataset = None
     if not args.skip_finetuned:
         console.print("\n[bold]━━ Fine-Tuned Pipeline (QLoRA) ━━[/bold]")
         try:
             ft = FineTunedInference(args.finetuned_model)
             ft.load()
-            ds = build_ragas_dataset_finetuned(ft, test_samples)
-            results["finetuned"] = run_ragas(
-                ds, args.metrics, "finetuned",_get_metrics,_build_judge,_build_embeddings,_extract_score
-                )
+            ft_dataset = build_ragas_dataset_finetuned(ft, test_samples)
         except FileNotFoundError as e:
             console.print(f"  [yellow]Skipping: {e}[/yellow]")
             results["finetuned"] = {}
 
-        # Release the fine-tuned model's VRAM before the RAG pipeline loads its own copy
+        # Release the fine-tuned model's VRAM before the RAG pipeline
         import gc, torch
         if "ft" in locals():
             del ft
@@ -226,6 +224,7 @@ def main():
             torch.cuda.empty_cache()
 
     #  RAG ---------------------------------------------------------------
+    rag_dataset = None
     if not args.skip_rag:
         console.print("\n[bold]━━ RAG Pipeline (FAISS + LangChain) ━━[/bold]")
         try:
@@ -237,11 +236,29 @@ def main():
                 k=args.k,
             )
             rag_chain.load()
-            ds = build_ragas_dataset_rag(rag_chain, test_samples)
-            results["rag"] = run_ragas(ds, args.metrics, "rag",_get_metrics,_build_judge,_build_embeddings,_extract_score)
+            rag_dataset = build_ragas_dataset_rag(rag_chain, test_samples)
         except FileNotFoundError as e:
             console.print(f"  [yellow]Skipping: {e}[/yellow]")
             results["rag"] = {}
+
+        # Release RAG model VRAM before judge loads
+        if "rag_chain" in locals():
+            del rag_chain
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    # --- Run RAGAS evaluations AFTER all models are unloaded ---
+    # This gives the judge LLM maximum VRAM
+    if ft_dataset is not None:
+        console.print("\n[bold]━━ Evaluating Fine-Tuned ━━[/bold]")
+        results["finetuned"] = run_ragas(
+            ft_dataset, args.metrics, "finetuned",_get_metrics,_build_judge,_build_embeddings,_extract_score
+            )
+
+    if rag_dataset is not None:
+        console.print("\n[bold]━━ Evaluating RAG ━━[/bold]")
+        results["rag"] = run_ragas(rag_dataset, args.metrics, "rag",_get_metrics,_build_judge,_build_embeddings,_extract_score)
 
     #  Save -----------------------------------------------------------------
     console.print()
