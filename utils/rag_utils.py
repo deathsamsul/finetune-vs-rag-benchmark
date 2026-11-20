@@ -33,17 +33,118 @@ def build_ragas_dataset_rag(rag_chain, test_samples: list):
 
 
 
-# run ragas 
-def run_ragas(dataset, metrics: list, pipeline_name: str ,get_metrics,build_judge,build_embeddings,extract_score) -> dict:
+# # run ragas 
+# def run_ragas(dataset, metrics: list, pipeline_name: str ,get_metrics,build_judge,build_embeddings,extract_score) -> dict:
+#     """
+#     Run RAGAS evaluation with Gemini judge + local embeddings.
+#     Returns {metric_name: float_score}.
+#     """
+#     import os
+#     from dotenv import load_dotenv
+#     load_dotenv()
+
+
+
+#     # Select judge provider and validate API key
+#     judge_provider = os.getenv("JUDGE_MODEL", "groq").strip().lower()
+
+#     api_key = None
+
+#     if judge_provider == "local":
+#         console.print("[green]Using local judge — no API key required.[/green]")
+
+#     elif judge_provider == "groq":
+#         api_key = os.getenv("GROQ_API_KEY", "").strip()
+
+#     elif judge_provider == "gemini":
+#         api_key = os.getenv("GEMINI_API_KEY", "").strip()
+
+#     elif judge_provider == "openai":
+#         api_key = os.getenv("OPENAI_API_KEY", "").strip()
+
+#     else:
+#         raise ValueError(
+#             f"Unsupported JUDGE_MODEL: {judge_provider}. "
+#             "Choose: local, groq, gemini, or openai."
+#         )
+
+#     if judge_provider != "local" and not api_key:
+#         raise EnvironmentError(
+#             f"{judge_provider.upper()} API key is missing. "
+#             f"Set the corresponding API key in your .env file."
+#         )
+
+
+
+#     faithfulness, answer_relevancy, context_precision = get_metrics()
+
+#     metric_map = {
+#         "faithfulness":      faithfulness,
+#         "answer_relevancy":  answer_relevancy,
+#         "context_precision": context_precision,
+#     }
+#     selected = [metric_map[m] for m in metrics if m in metric_map]
+
+#     if pipeline_name == "finetuned" and context_precision in selected:
+#         selected.remove(context_precision)
+#         console.print("  [dim]context_precision skipped for fine-tuned "
+#                     "(no retrieval step)[/dim]")
+
+#     judge      = build_judge(api_key)
+#     embeddings = build_embeddings()
+
+#     console.print(
+#         f"  Running RAGAS ({len(selected)} metrics)  "
+#         f"[dim]judge: {judge_provider}  |  embeddings: {EMBED_MODEL}[/dim]"
+#     )
+
+#     with warnings.catch_warnings():
+#         warnings.simplefilter("ignore")
+#         from ragas import evaluate
+
+#         result = evaluate(
+#             dataset,
+#             metrics=selected,
+#             llm=judge,
+#             embeddings=embeddings,
+#             raise_exceptions=False,
+#         )
+
+#     scores = {}
+#     for metric in selected:
+#         key   = metric.name
+#         score = extract_score(result, key)
+#         if score != score:  # NaN check
+#             console.print(
+#                 f"  [yellow]⚠  {key} = NaN — judge failed. "
+#                 f"Check {judge_provider.upper()}_API_KEY quota at {judge_provider.upper()}_API_KEY[/yellow]"
+#             )
+#         else:
+#             console.print(f"  [green]✓[/green]  {key} = [bold]{score:.3f}[/bold]")
+#         scores[key] = score
+
+#     return scores
+
+
+
+
+def run_ragas(
+    dataset,
+    metrics: list,
+    pipeline_name: str,
+    get_metrics,
+    build_judge,
+    build_embeddings,
+    extract_score,
+) -> dict:
     """
-    Run RAGAS evaluation with Gemini judge + local embeddings.
+    Run RAGAS evaluation with configurable judge and local embeddings.
     Returns {metric_name: float_score}.
     """
     import os
     from dotenv import load_dotenv
+
     load_dotenv()
-
-
 
     # Select judge provider and validate API key
     judge_provider = os.getenv("JUDGE_MODEL", "groq").strip().lower()
@@ -51,7 +152,9 @@ def run_ragas(dataset, metrics: list, pipeline_name: str ,get_metrics,build_judg
     api_key = None
 
     if judge_provider == "local":
-        console.print("[green]Using local judge — no API key required.[/green]")
+        console.print(
+            "[green]Using local judge — no API key required.[/green]"
+        )
 
     elif judge_provider == "groq":
         api_key = os.getenv("GROQ_API_KEY", "").strip()
@@ -71,56 +174,84 @@ def run_ragas(dataset, metrics: list, pipeline_name: str ,get_metrics,build_judg
     if judge_provider != "local" and not api_key:
         raise EnvironmentError(
             f"{judge_provider.upper()} API key is missing. "
-            f"Set the corresponding API key in your .env file."
+            "Set the corresponding API key in your .env file."
         )
 
-
-
+    # Build metrics
     faithfulness, answer_relevancy, context_precision = get_metrics()
 
     metric_map = {
-        "faithfulness":      faithfulness,
-        "answer_relevancy":  answer_relevancy,
+        "faithfulness": faithfulness,
+        "answer_relevancy": answer_relevancy,
         "context_precision": context_precision,
     }
-    selected = [metric_map[m] for m in metrics if m in metric_map]
+
+    selected = [
+        metric_map[m]
+        for m in metrics
+        if m in metric_map
+    ]
 
     if pipeline_name == "finetuned" and context_precision in selected:
         selected.remove(context_precision)
-        console.print("  [dim]context_precision skipped for fine-tuned "
-                    "(no retrieval step)[/dim]")
+        console.print(
+            "  [dim]context_precision skipped for fine-tuned "
+            "(no retrieval step)[/dim]"
+        )
 
-    judge      = build_judge(api_key)
+    # Build judge and embeddings
+    judge = build_judge(api_key)
     embeddings = build_embeddings()
 
     console.print(
-        f"  Running RAGAS ({len(selected)} metrics)  "
-        f"[dim]judge: {judge_provider}  |  embeddings: {EMBED_MODEL}[/dim]"
+        f"  Running RAGAS ({len(selected)} metrics) "
+        f"[dim]judge: {judge_provider} | embeddings: {EMBED_MODEL}[/dim]"
+    )
+
+    # Evaluation configuration
+    from ragas import evaluate
+    from ragas.run_config import RunConfig
+
+    run_config = RunConfig(
+        timeout=300,
+        max_retries=2,
+        max_workers=1,
+    )
+
+    console.print(
+        "  [dim]Evaluation config: timeout=300s | "
+        "retries=2 | workers=1[/dim]"
     )
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        from ragas import evaluate
 
         result = evaluate(
             dataset,
             metrics=selected,
             llm=judge,
             embeddings=embeddings,
+            run_config=run_config,
             raise_exceptions=False,
         )
 
+    # Extract scores
     scores = {}
+
     for metric in selected:
-        key   = metric.name
+        key = metric.name
         score = extract_score(result, key)
-        if score != score:  # NaN check
+
+        if score is None or not isinstance(score, (int, float)) or not __import__("math").isfinite(score):
             console.print(
-                f"  [yellow]⚠  {key} = NaN — judge failed. "
-                f"Check {judge_provider.upper()}_API_KEY quota at {judge_provider.upper()}_API_KEY[/yellow]"
+                f"  [yellow]⚠ {key} = NaN — evaluation failed "
+                f"or timed out using {judge_provider} judge.[/yellow]"
             )
         else:
-            console.print(f"  [green]✓[/green]  {key} = [bold]{score:.3f}[/bold]")
+            console.print(
+                f"  [green]✓[/green] {key} = [bold]{score:.3f}[/bold]"
+            )
+
         scores[key] = score
 
     return scores
