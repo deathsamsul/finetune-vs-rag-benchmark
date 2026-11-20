@@ -410,6 +410,13 @@ small {{ color: #555; }}
         json.dumps(summary, indent=2), encoding="utf-8"
     )
 
+    # Also generate pro visualization suite (embeddings PCA, dataset distributions, radar, latency ECDF)
+    try:
+        from evaluation.pro_visualizations import render_all_pro_visualizations
+        render_all_pro_visualizations()
+    except Exception as e:
+        print(f"Note: Pro visualizations skipped ({e})")
+
     print("\nVisualization generation complete.")
     print(f"Output directory: {out}")
     for title, filename in chart_files:

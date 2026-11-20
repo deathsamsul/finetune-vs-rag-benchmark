@@ -1,15 +1,15 @@
 {
-  "timestamp": "2026-11-19T13:33:50.019760",
-  "n_samples": 2,
+  "timestamp": "2026-11-20T09:40:57.413944",
+  "n_samples": 15,
   "scores": {
     "finetuned": {
-      "faithfulness": 0.1111111111111111,
-      "answer_relevancy": NaN
+      "faithfulness": 0.32196969696969696,
+      "answer_relevancy": 0.2845947166169499
     },
     "rag": {
-      "faithfulness": 0.0,
-      "answer_relevancy": 0.43649620860292215,
-      "context_precision": 0.2499999999875
+      "faithfulness": 0.014285714285714287,
+      "answer_relevancy": 0.3200522622145352,
+      "context_precision": 0.03888888888694444
     }
   },
   "config": {
@@ -21,7 +21,7 @@
       "context_precision"
     ],
     "k": 4,
-    "judge": "groq",
+    "judge": "local",
     "embeddings": "sentence-transformers/all-MiniLM-L6-v2"
   }
 }

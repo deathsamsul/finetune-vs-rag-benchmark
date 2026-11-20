@@ -18,6 +18,18 @@ def generate_markdown_report(results: dict, output_path: Path):
     rag = results.get("rag",       {})
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
+    judge_provider = os.getenv("JUDGE_MODEL", "local").strip().lower()
+    if judge_provider == "local":
+        judge_name = os.getenv("LOCAL_JUDGE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+    elif judge_provider == "groq":
+        judge_name = os.getenv("GROQ_MODEL", "Groq")
+    elif judge_provider == "gemini":
+        judge_name = os.getenv("GEMINI_MODEL", "Gemini")
+    else:
+        judge_name = os.getenv("OPENAI_MODEL", "OpenAI")
+
+    embed_name = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2").strip()
+
     def fmt(v):
         if v is None: return "N/A"
         if v != v:    return "NaN"
@@ -29,9 +41,9 @@ def generate_markdown_report(results: dict, output_path: Path):
         "\n## Setup",
         "\n| Component | Value |",
         "|---|---|",
-        f"| LLM judge | {GEMINI_MODEL} |",
-        f"| Embeddings | {EMBED_MODEL} (local) |",
-        "| Dataset | lavita/ChatDoctor-HealthCareMagic-100k (10k samples) |",
+        f"| LLM judge | {judge_name} ({judge_provider}) |",
+        f"| Embeddings | {embed_name} (local) |",
+        "| Dataset | MedQuAD / MedQA (held-out test split) |",
         "| Fine-tune | QLoRA, Llama-3.2-3B-Instruct, 3 epochs |",
         "| RAG | LangChain + FAISS, k=4 chunks |",
         "\n## Results",
@@ -53,9 +65,9 @@ def generate_markdown_report(results: dict, output_path: Path):
         "| context_precision | Relevant RAG chunks ranked first (RAG only) | Better retrieval |",
         "\n## Notes",
         "\n- Test split held out — no data leakage between pipelines.",
-        f"- RAGAS judge: {GEMINI_MODEL} (scores have ~3-5% variance).",
+        f"- RAGAS judge: {judge_name} (scores have ~3-5% variance).",
         "- context_precision N/A for fine-tuned (no retrieval step).",
-        f"- Embeddings: {EMBED_MODEL} (same model used in RAG pipeline).",
+        f"- Embeddings: {embed_name} (same model used in RAG pipeline).",
     ]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

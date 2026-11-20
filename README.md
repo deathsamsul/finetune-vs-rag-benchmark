@@ -3,6 +3,10 @@
 > **A rigorous, reproducible head-to-head evaluation of LoRA fine-tuning vs. RAG on MedQuAD.**  
 > Featuring a **Modular, Dynamic LLM Judge Architecture** supporting local 4-bit models (Laptop & Kaggle GPU) and cloud API providers (Groq, OpenRouter, Gemini, OpenAI) with zero code modifications.
 
+[Kaggle-notebook](https://www.kaggle.com/code/saamhm/finetune-vs-rag-experiment)
+[Kaggle-Fine-Tune-notebook](https://www.kaggle.com/code/saamhm/fine-tuned-llm-vs-rag-portfolio-project/output)
+
+
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x-orange.svg)](https://pytorch.org/)
 [![Tests](https://img.shields.io/badge/tests-101%20passed-brightgreen.svg)](tests/)
@@ -289,4 +293,4 @@ POST /query
 
 **Samsul Hoque Mondal**  
 *MLOps / GenAI / Agentic AI Engineer*  
-[LinkedIn](https://linkedin.com/in/deathsamsul) · [GitHub](https://github.com/deathsamsul)
+[LinkedIn](https://linkedin.com/in/deathsamsul) · [GitHub](https://github.com/deathsamsul) · [Kaggle](https://www.kaggle.com/saamhm)

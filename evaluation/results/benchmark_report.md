@@ -1,13 +1,13 @@
 # RAGAS Benchmark Report
 
-Generated: 2026-11-19 13:33
+Generated: 2026-11-20 09:40
 
 ## Setup
 
 | Component | Value |
 |---|---|
 | LLM judge |  |
-| Embeddings |  (local) |
+| Embeddings | sentence-transformers/all-MiniLM-L6-v2 (local) |
 | Dataset | lavita/ChatDoctor-HealthCareMagic-100k (10k samples) |
 | Fine-tune | QLoRA, Llama-3.2-3B-Instruct, 3 epochs |
 | RAG | LangChain + FAISS, k=4 chunks |
@@ -16,9 +16,9 @@ Generated: 2026-11-19 13:33
 
 | Metric | Fine-Tuned (QLoRA) | RAG (FAISS) | Winner |
 |---|---|---|---|
-| answer_relevancy | NaN | 0.436 | — |
-| context_precision | N/A | 0.250 | — |
-| faithfulness | 0.111 | 0.000 | — |
+| answer_relevancy | 0.285 | 0.320 | RAG |
+| context_precision | N/A | 0.039 | — |
+| faithfulness | 0.322 | 0.014 | Fine-Tuned |
 
 ## Metric Definitions
 
@@ -33,4 +33,4 @@ Generated: 2026-11-19 13:33
 - Test split held out — no data leakage between pipelines.
 - RAGAS judge:  (scores have ~3-5% variance).
 - context_precision N/A for fine-tuned (no retrieval step).
-- Embeddings:  (same model used in RAG pipeline).
+- Embeddings: sentence-transformers/all-MiniLM-L6-v2 (same model used in RAG pipeline).
