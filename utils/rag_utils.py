@@ -22,11 +22,13 @@ def build_ragas_dataset_rag(rag_chain, test_samples: list):
                 "answer":       r["answer"],
                 "contexts":     r["contexts"] or [""],
                 "ground_truth": sample["answer"],
+                "sources":      "|".join(r.get("sources", [])),
+                "latency_ms":   r.get("latency_ms", 0.0),
             })
         except Exception as e:
             console.print(f"  [yellow]RAG error: {e}[/yellow]")
             rows.append({"question": sample["question"], "answer": "",
-                         "contexts": [""], "ground_truth": sample["answer"]})
+                         "contexts": [""], "ground_truth": sample["answer"], "sources": "", "latency_ms": 0.0})
     return Dataset.from_list(rows)
 
 

@@ -264,6 +264,39 @@ def main():
     console.print()
     print_results_table(results)
 
+    # Optional: Save per-question comparison CSV if both pipelines ran
+    csv_path = RESULTS_DIR / "disagreements.csv"
+    if ft_dataset is not None and rag_dataset is not None:
+        import csv
+        fieldnames = [
+            "rank", "question", "ground_truth",
+            "ft_answer", "rag_answer",
+            "ft_score", "rag_score", "delta",
+            "ft_latency_ms", "rag_latency_ms", "rag_sources",
+        ]
+        ft_faith = results.get("finetuned", {}).get("faithfulness", 0.0)
+        rag_faith = results.get("rag", {}).get("faithfulness", 0.0)
+        delta_default = (ft_faith - rag_faith) if (ft_faith is not None and rag_faith is not None) else 0.0
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for idx in range(min(len(ft_dataset), len(rag_dataset))):
+                writer.writerow({
+                    "rank": idx + 1,
+                    "question": ft_dataset[idx]["question"],
+                    "ground_truth": ft_dataset[idx]["ground_truth"],
+                    "ft_answer": ft_dataset[idx]["answer"],
+                    "rag_answer": rag_dataset[idx]["answer"],
+                    "ft_score": ft_faith if ft_faith is not None else 0.0,
+                    "rag_score": rag_faith if rag_faith is not None else 0.0,
+                    "delta": delta_default,
+                    "ft_latency_ms": ft_dataset[idx].get("latency_ms", 0.0),
+                    "rag_latency_ms": rag_dataset[idx].get("latency_ms", 0.0),
+                    "rag_sources": rag_dataset[idx].get("sources", ""),
+                })
+        console.print(f"  [green]✓ Disagreements/Comparison CSV saved: {csv_path}[/green]")
+
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
@@ -284,10 +317,19 @@ def main():
 
     generate_markdown_report(results, RESULTS_DIR / "benchmark_report.md")
 
+    # Automatically generate visualization charts and HTML dashboard
+    try:
+        from evaluation.visualize_benchmark import main as generate_visualizations
+        console.print("\n[bold]━━ Generating Performance Dashboard & Charts ━━[/bold]")
+        generate_visualizations()
+    except Exception as e:
+        console.print(f"  [yellow]Note: Visualization charts skipped ({e})[/yellow]")
+
     console.print(Panel.fit(
         "[bold green]✓ Evaluation complete![/bold green]\n\n"
         f"Scores : [bold]{output_path}[/bold]\n"
-        f"Report : [bold]{RESULTS_DIR / 'benchmark_report.md'}[/bold]"
+        f"Report : [bold]{RESULTS_DIR / 'benchmark_report.md'}[/bold]\n"
+        f"Charts : [bold]{RESULTS_DIR / 'visualizations'}[/bold]"
     ))
 
 

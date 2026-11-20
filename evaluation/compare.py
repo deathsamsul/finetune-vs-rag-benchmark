@@ -61,33 +61,24 @@ def run_per_sample_ragas(dataset, metric_name: str) -> list[float]:
     """
     from ragas import evaluate
     from ragas.metrics import faithfulness, answer_relevancy
-    from ragas.llms import LangchainLLMWrapper
-    from ragas.embeddings import LangchainEmbeddingsWrapper
-    from langchain_groq import ChatGroq
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from evaluation.run_ragas import _build_judge, _build_embeddings
 
+    judge_provider = os.getenv("JUDGE_MODEL", "groq").strip().lower()
+    api_key = ""
+    if judge_provider == "groq":
+        api_key = os.getenv("GROQ_API_KEY", "").strip()
+    elif judge_provider == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    elif judge_provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
 
-    api_key = os.getenv("GROQ_API_KEY")
-    model_name = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-
-    if not api_key:
-        raise ValueError(
-            "GROQ_API_KEY is missing. Check your .env file.")
-
-    groq_llm = ChatGroq(model=model_name,
-                        api_key=api_key,
-                        temperature=0,)
+    evaluator_llm = _build_judge(api_key)
+    evaluator_embeddings = _build_embeddings()
     
-    evaluator_llm = LangchainLLMWrapper(groq_llm)
-
-    # Use local embeddings instead of OpenAI embeddings.
-    hf_embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-    evaluator_embeddings = LangchainEmbeddingsWrapper(hf_embeddings)
-    
-    metric_map = {"faithfulness":     faithfulness,
-                   "answer_relevancy": answer_relevancy, }
+    metric_map = {
+        "faithfulness":     faithfulness,
+        "answer_relevancy": answer_relevancy,
+    }
     
     metric = metric_map[metric_name]
     metric.llm = evaluator_llm       # Explicitly configure the metric's judge and embeddings.

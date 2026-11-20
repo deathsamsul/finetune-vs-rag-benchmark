@@ -21,9 +21,10 @@ def build_ragas_dataset_finetuned(ft_model, test_samples: list):
                 "answer":       r["answer"],
                 "contexts":     [sample["answer"]],
                 "ground_truth": sample["answer"],
+                "latency_ms":   r.get("latency_ms", 0.0),
             })
         except Exception as e:
             console.print(f"  [yellow]FT error: {e}[/yellow]")
             rows.append({"question": sample["question"], "answer": "",
-                         "contexts": [""], "ground_truth": sample["answer"]})
+                         "contexts": [""], "ground_truth": sample["answer"], "latency_ms": 0.0})
     return Dataset.from_list(rows)
