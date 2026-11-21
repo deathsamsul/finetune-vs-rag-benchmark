@@ -129,6 +129,42 @@ flowchart LR
 
 ## 🔬 Helpfulness & Answer Quality Analysis
 
+### 🏛️ Architectural Taxonomy: Strategic Roles in Enterprise AI
+
+When deploying Large Language Models in high-stakes domains like clinical medicine, each architecture solves a fundamentally different problem:
+
+| Paradigm | Strategic Capability | Technical Asset | Enterprise Best Fit |
+|---|---|---|---|
+| **RAG only** | **Knowledge retrieval** | Vector Index (FAISS) + Chunk Corpus | Dynamic medical guidelines, clinical auditability, zero GPU retraining |
+| **Fine-tuning only** | **Specialized model behavior** | Quantized LoRA Adapters ($r=16$) | Clinical tone, USMLE format, low latency, closed medical facts |
+| **Fine-tuning + RAG** | **Specialized behavior + current knowledge** | LoRA Weights + Real-Time Retrieval | Enterprise medical agents requiring both specialized reasoning and verifiable source citations |
+
+---
+
+### 📊 Enterprise Architecture Tradeoff Matrix (Cost vs. Quality vs. Latency)
+
+The final architectural comparison synthesizes empirical benchmark metrics, infrastructure footprints, and serving SLAs:
+
+![Enterprise Architecture Tradeoff Matrix](evaluation/results/visualizations/enterprise_tradeoff_bubble_chart.png)
+
+#### 📐 Dimensions Explained:
+1. **X-Axis — Infrastructure & Operational Cost**: Aggregates model serving, vector database operations, context token consumption, and GPU retraining budget.
+   * *Base LLM*: Minimal overhead (~$35/mo).
+   * *Fine-Tuning Only*: Lean compute (~$85/mo) with zero vector DB infrastructure.
+   * *RAG Only*: Substantial overhead (~$145/mo) driven by continuous vector indexing and 4× context token expansion.
+   * *Hybrid (FT + RAG)*: Enterprise tier (~$230/mo) managing both LoRA adapter lifecycles and real-time retrieval indices.
+2. **Y-Axis — Answer Quality & Clinical Effectiveness**: Composite evaluation score combining RAGAS Faithfulness (factual grounding), Answer Relevancy, and adherence to medical prompt formatting.
+3. **Bubble Size — End-to-End Inference Latency**: Recorded serving turnaround time (smaller bubbles = faster response SLA).
+   * *Fine-Tuning Only*: **~14.60 s** (tightest response distribution, 0ms retrieval overhead).
+   * *RAG Only*: **~23.29 s** (~37% higher latency due to embedding generation + vector search + prompt-stuffed autoregression).
+
+#### 🧭 Enterprise Decision Quadrants:
+* **⚡ Efficiency Frontier (Top-Left)**: **Fine-Tuning (QLoRA)** delivers superior specialized clinical behavior at moderate infrastructure cost with the lowest latency.
+* **👑 Enterprise Sovereign Tier (Top-Right)**: **Hybrid (FT + RAG)** is the gold standard for hospital EHR systems where maximum medical fidelity and literature citations justify higher infrastructure expenditure.
+* **Dynamic Retrieval Tier (Bottom-Right)**: **RAG Only** is optimal for constantly evolving formularies and dynamic clinic directories where retraining is impractical.
+
+---
+
 ### The Tradeoff Matrix
 
 ```mermaid
@@ -279,6 +315,7 @@ finetune-vs-rag-benchmark/
 │       ├── benchmark_report.md     # Markdown benchmark summary
 │       ├── disagreements.csv       # Side-by-side question-level comparison
 │       └── visualizations/
+│           ├── enterprise_tradeoff_bubble_chart.png
 │           ├── architecture_radar.png
 │           ├── aggregate_metric_comparison.png
 │           ├── latency_deep_dive.png

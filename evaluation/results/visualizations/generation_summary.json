@@ -4,6 +4,7 @@
   "aggregate_samples": 30,
   "csv_rows": 30,
   "charts": [
+    "enterprise_tradeoff_bubble_chart.png",
     "architecture_radar.png",
     "aggregate_metric_comparison.png",
     "latency_deep_dive.png",

@@ -276,6 +276,7 @@ def main():
 
     # Include pro visualization charts in reports if available
     pro_chart_specs = [
+        ("Enterprise MLOps architecture tradeoff matrix", "enterprise_tradeoff_bubble_chart.png"),
         ("Multidimensional architecture radar", "architecture_radar.png"),
         ("Inference latency deep dive (ECDF & spread)", "latency_deep_dive.png"),
         ("Semantic embedding space (PCA 2D projection)", "embedding_space_pca.png"),
