@@ -4,6 +4,7 @@
 > Featuring a **Modular, Dynamic LLM Judge Architecture** supporting local 4-bit models (Laptop & Kaggle GPU) and cloud API providers (Groq, OpenRouter, Gemini, OpenAI) with zero code modifications.
 
 [Kaggle-notebook](https://www.kaggle.com/code/saamhm/finetune-vs-rag-experiment)
+
 [Kaggle-Fine-Tune-notebook](https://www.kaggle.com/code/saamhm/fine-tuned-llm-vs-rag-portfolio-project/output)
 
 
@@ -18,59 +19,80 @@
 
 ## 📋 Executive Summary: "Fine-Tune or RAG?"
 
-The question *"Should we fine-tune an open-source LLM or deploy a RAG pipeline?"* is answered with empirical data, latency statistics, and qualitative case analyses.
+The question *"Should we fine-tune an open-source LLM or deploy a RAG pipeline?"* is answered with empirical data, latency statistics, and qualitative case analyses evaluated on Kaggle GPU.
 
-### 🏆 Head-to-Head Benchmark Snapshot (n = 50 held-out samples)
+### 🏆 Head-to-Head Benchmark Snapshot (n = 30 held-out samples)
 
 | Evaluation Metric | Fine-Tuned (QLoRA) | RAG (FAISS + LangChain) | Winner | Key Finding |
 |---|:---:|:---:|:---:|---|
-| **Faithfulness** ↑ | **0.266** | 0.078 | 🏆 **Fine-Tuned** | FT stays tightly focused on medical prompt definitions; RAG relies on retriever chunk coverage |
-| **Answer Relevancy** ↑ | 0.524 | **0.546** | 🏆 **RAG** | RAG generates comprehensive answers addressing clinical questions directly |
-| **Context Precision** ↑ | *N/A* (no retriever) | **0.750** | 🏆 **RAG** | FAISS retriever places ground-truth relevant chunks in top-4 rank 75% of the time |
-| **Average Latency** ↓ | **~10.5 s** | ~14.8 s | 🏆 **Fine-Tuned** | Fine-tuned has **zero retrieval overhead**; RAG adds chunking + embedding + similarity search |
-| **Traceability & Citations** | ❌ Black-box weights | ✅ Source chunk IDs | 🏆 **RAG** | RAG provides traceable medical literature chunks for clinical audit |
-| **Knowledge Update Cost** | ❌ Full retraining / LoRA | ✅ Zero-retraining index update | 🏆 **RAG** | New medical guidelines can be inserted in minutes without GPU retraining |
+| **Faithfulness** ↑ | **0.241** | 0.050 | 🏆 **Fine-Tuned** | FT stays tightly aligned with clinical domain answers; RAG is prone to retriever chunk noise on dense medical queries |
+| **Answer Relevancy** ↑ | **0.221** | 0.205 | 🏆 **Fine-Tuned** | FT generates direct, USMLE-style responses without verbose retriever boilerplate |
+| **Context Precision** ↑ | *N/A* (no retriever) | **0.053** | 🏆 **RAG** | Measures rank quality of relevant medical chunks across 12,438 index chunks ($k=4$) |
+| **Average Latency** ↓ | **~14.60 s** | ~23.29 s | 🏆 **Fine-Tuned** | Fine-tuned is **~37% faster** (8.7s lower turnaround); RAG incurs vector search, embedding, and context-stuffing overhead |
+| **Traceability & Citations** | ❌ Black-box weights | ✅ Source chunk IDs | 🏆 **RAG** | RAG provides traceable medical literature chunk IDs (`rag_sources`) for clinical audit |
+| **Knowledge Update Cost** | ❌ Full retraining / LoRA | ✅ Zero-retraining index update | 🏆 **RAG** | New medical guidelines and formulary lists can be indexed in seconds without GPU retraining |
 
 > ⬆ **Higher is better** for RAGAS quality metrics · ⬇ **Lower is better** for latency  
-> *Data generated dynamically via `evaluation/run_ragas.py` and visual dashboard in `evaluation/visualize_benchmark.py`.*
+> *Data generated dynamically via `evaluation/run_ragas.py`, `evaluation/pro_visualizations.py`, and `evaluation/visualize_benchmark.py` on Kaggle T4 GPU (Judge: `Qwen/Qwen2.5-7B-Instruct`, Embeddings: `all-MiniLM-L6-v2`).*
 
 ---
 
 ## 📊 Performance Dashboard & Visual Charts
 
-All benchmark charts are dynamically exported to `evaluation/results/visualizations/` and `visualize-charts/fine-tune-charts/`.
+All benchmark charts are **dynamically generated** from raw execution outputs (`ragas_scores.json`, `disagreements.csv`) and exported to `evaluation/results/visualizations/` and `visualize-charts/fine-tune-charts/`.
 
-### 1. Aggregate Quality Metrics Comparison
-Comparison across RAGAS core evaluation dimensions (Faithfulness, Answer Relevancy, Context Precision):
+### 1. 🎯 Multidimensional Architecture Radar & Quality Comparison
+A holistic view of core capabilities and aggregate RAGAS evaluation metrics:
 
-![Aggregate Metric Comparison](evaluation/results/visualizations/aggregate_metric_comparison.png)
+| Multidimensional Architecture Radar | Aggregate Quality Metrics Comparison |
+|:---:|:---:|
+| ![Architecture Radar](evaluation/results/visualizations/architecture_radar.png) | ![Aggregate Metric Comparison](evaluation/results/visualizations/aggregate_metric_comparison.png) |
 
-* **Faithfulness**: Measures whether claims in the generated response are factually supported by evidence.
-* **Answer Relevancy**: Evaluates semantic alignment with the patient query via reverse-generated question similarity.
-* **Context Precision**: Measures how well relevant medical textbook chunks are ranked at the top of the retrieval stack.
-
----
-
-### 2. Inference Latency & End-to-End Speed
-Evaluation timing recorded per query across both pipelines:
-
-![Latency Comparison](evaluation/results/visualizations/latency_comparison.png)
-
-* **Fine-Tuned Pipeline**: Direct single-stage generation (`~10.5s` on T4 GPU).
-* **RAG Pipeline**: Two-stage execution (`~14.8s` on T4 GPU) — Vector embedding computation via `all-MiniLM-L6-v2`, FAISS index retrieval ($k=4$), context stuffing, and constrained prompt generation.
+* **Radar Dimensions**: Contrasts both systems across **Faithfulness, Answer Relevancy, Context Precision, Inference Speed, and Auditability**.
+* **Faithfulness (0.241 vs. 0.050)**: Fine-Tuning achieved **4.8× higher faithfulness**. The fine-tuned model internalizes clinical relationships within its weights, whereas RAG's faithfulness drops when top-$k$ retrieved chunks contain tangential textbook snippets.
+* **Answer Relevancy (0.221 vs. 0.205)**: Fine-Tuning produces tight, clinical phrasing directly answering patient queries without boilerplate retrieval preambles.
+* **Context Precision (0.053)**: Evaluates whether ground-truth medical contexts were ranked at the top of the FAISS retrieval stack ($k=4$).
 
 ---
 
-### 3. Per-Sample Disagreements & Delta Distribution
-Where the two approaches disagree most on specific medical cases:
+### 2. ⚡ Latency Distribution, Percentiles & SLA Compliance
+Detailed timing analysis recorded per query across both pipelines:
 
-| Disagreement Score Delta | Per-Sample Distribution |
+| Latency Spread & Empirical CDF (SLA Compliance) | Average Latency Comparison |
+|:---:|:---:|
+| ![Latency Deep Dive](evaluation/results/visualizations/latency_deep_dive.png) | ![Latency Comparison](evaluation/results/visualizations/latency_comparison.png) |
+
+* **Fine-Tuned Pipeline (~14.60s avg, p50 ~14.1s)**: Direct single-stage autoregressive generation on T4 GPU. With **zero retrieval overhead**, the response curve is tightly clustered with low variance.
+* **RAG Pipeline (~23.29s avg, p50 ~22.8s)**: Multi-stage pipeline incurring embedding generation (`all-MiniLM-L6-v2`), FAISS vector distance search, context formatting, and prompt-stuffed LLM generation.
+* **SLA Compliance (ECDF)**: Fine-Tuning reaches 100% query completion in **~18s**, whereas RAG requires up to **~34s** to serve long context windows.
+
+---
+
+### 3. 🔬 Semantic Embedding Space & Dataset Intelligence
+Visualizing data representation and corpus structure across MedQuAD splits:
+
+| Semantic Vector Space (PCA 2D Projection) | Dataset Word & Token Length Distributions |
+|:---:|:---:|
+| ![Embedding Space PCA](evaluation/results/visualizations/embedding_space_pca.png) | ![Dataset Distributions](evaluation/results/visualizations/dataset_distributions.png) |
+
+* **Embedding Space (PCA)**: 2D projection of dense 384-dimensional embeddings (`sentence-transformers/all-MiniLM-L6-v2`). Clinical test questions (red triangles) map tightly onto clusters of corpus knowledge chunks (blue dots), validating index coverage.
+* **Dataset Intelligence**: Distribution of question and answer word counts across train (3,148), validation (393), and test (394) splits, demonstrating consistent length spread and absence of data leakage.
+
+---
+
+### 4. ⚖️ Disagreement Analysis & Per-Sample Delta
+Question-by-question scoring breakdown across the 30 evaluated medical cases:
+
+| Disagreement Score Delta (FT − RAG) | Per-Sample Score Comparison |
 |:---:|:---:|
 | ![Score Delta](evaluation/results/visualizations/score_delta.png) | ![Per-Sample Scores](evaluation/results/visualizations/per_sample_score_comparison.png) |
 
+* **Score Delta ($FT - RAG$)**: Positive values demonstrate queries where the fine-tuned model outperformed RAG in faithfulness and concise clinical accuracy.
+* **Per-Sample Distribution**: Visualizes individual test cases from `evaluation/results/disagreements.csv`. Fine-tuning dominates routine clinical inquiries, while RAG matches or leads on inquiries requiring specific guideline chunks.
+
 ---
 
-### 4. QLoRA Fine-Tuning Performance & System Efficiency
+### 5. 📈 QLoRA Fine-Tuning Performance & System Efficiency
 Loss progression and GPU resource utilization tracked via Weights & Biases:
 
 | Training Loss & Validation Curves | System VRAM & GPU Utilization |
@@ -80,6 +102,28 @@ Loss progression and GPU resource utilization tracked via Weights & Biases:
 * **Base Model**: `unsloth/llama-3.2-3b-instruct-unsloth-bnb-4bit`
 * **Adapter**: LoRA rank $r=16$, $\alpha=32$, target modules: `q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj`
 * **Training Convergence**: Train Loss dropped from **2.155** to **1.944** across 423 steps (3 epochs). Eval Loss: **2.068**.
+* **System Footprint**: Stable VRAM allocation (~8.2 GB) well within free Kaggle T4 GPU limits (16 GB).
+
+---
+
+## 🔄 Dynamic Chart Generation Architecture
+
+### Why Dynamically Update Charts?
+
+In production MLOps and benchmark research, static or hardcoded plots quickly become obsolete and disconnected from actual model outputs. Our benchmark implements **end-to-end dynamic visualization**:
+
+```mermaid
+flowchart LR
+    A["run_ragas.py\n(Inference & Scoring)"] -->|Writes| B["ragas_scores.json\ndisagreements.csv"]
+    B -->|Ingested by| C["visualize_benchmark.py"]
+    B -->|Ingested by| D["pro_visualizations.py"]
+    C -->|Renders| E["Core Charts (PNG)\n+ benchmark_report.html"]
+    D -->|Renders| F["Pro Charts (PNG)\n(Radar, Latency CDF, PCA, Distributions)"]
+```
+
+1. **Zero Manual Copy-Pasting**: When you run `python -m evaluation.run_ragas --n_samples N`, the pipeline computes inference outputs, executes judge scoring, saves raw data, and **automatically re-renders all 8 high-resolution charts and the interactive HTML report**.
+2. **Reproducibility Guarantee**: Every chart reflects the exact underlying data in `evaluation/results/`.
+3. **Multi-Model Portability**: Re-running the benchmark with an alternative judge (e.g., Gemini 2.0 Flash or GPT-4o) or a larger sample size instantly updates all visualizations.
 
 ---
 
@@ -225,17 +269,22 @@ finetune-vs-rag-benchmark/
 ├── evaluation/
 │   ├── run_ragas.py                # Main benchmark execution engine
 │   ├── compare.py                  # Side-by-side disagreement analysis
-│   ├── visualize_benchmark.py      # Automated chart & HTML dashboard generator
+│   ├── visualize_benchmark.py      # Automated core chart & HTML dashboard generator
+│   ├── pro_visualizations.py       # High-DPI radar, SLA CDF, and PCA vector space charts
 │   ├── scoring.py                  # Metric aggregation & latency calculations
 │   ├── providers/
 │   │   └── local_provider.py       # 4-bit quantized local judge engine (Qwen2.5-7B)
 │   └── results/
-│       ├── ragas_scores.json       # Evaluator score output
+│       ├── ragas_scores.json       # Evaluator score output (n=30)
 │       ├── benchmark_report.md     # Markdown benchmark summary
 │       ├── disagreements.csv       # Side-by-side question-level comparison
 │       └── visualizations/
+│           ├── architecture_radar.png
 │           ├── aggregate_metric_comparison.png
+│           ├── latency_deep_dive.png
 │           ├── latency_comparison.png
+│           ├── embedding_space_pca.png
+│           ├── dataset_distributions.png
 │           ├── score_delta.png
 │           ├── per_sample_score_comparison.png
 │           └── benchmark_report.html

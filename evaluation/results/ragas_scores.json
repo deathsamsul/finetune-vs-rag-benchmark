@@ -1,15 +1,15 @@
 {
-  "timestamp": "2026-11-20T09:40:57.413944",
-  "n_samples": 15,
+  "timestamp": "2026-11-20T23:27:11.688342",
+  "n_samples": 30,
   "scores": {
     "finetuned": {
-      "faithfulness": 0.32196969696969696,
-      "answer_relevancy": 0.2845947166169499
+      "faithfulness": 0.24079244829244828,
+      "answer_relevancy": 0.22139142641189302
     },
     "rag": {
-      "faithfulness": 0.014285714285714287,
-      "answer_relevancy": 0.3200522622145352,
-      "context_precision": 0.03888888888694444
+      "faithfulness": 0.05023289467733912,
+      "answer_relevancy": 0.2049753346213582,
+      "context_precision": 0.05277777777347222
     }
   },
   "config": {

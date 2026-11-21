@@ -1,17 +1,19 @@
 {
-  "input_scores_json": "evaluation/results/ragas_scores.json",
-  "input_disagreements_csv": "evaluation/results/disagreements.csv",
-  "aggregate_samples": 2,
-  "csv_rows": 1,
+  "input_scores_json": "evaluation\\results\\ragas_scores.json",
+  "input_disagreements_csv": "evaluation\\results\\disagreements.csv",
+  "aggregate_samples": 30,
+  "csv_rows": 30,
   "charts": [
+    "architecture_radar.png",
     "aggregate_metric_comparison.png",
+    "latency_deep_dive.png",
     "latency_comparison.png",
-    "per_sample_score_comparison.png",
-    "score_delta.png"
+    "embedding_space_pca.png",
+    "dataset_distributions.png",
+    "score_delta.png",
+    "per_sample_score_comparison.png"
   ],
-  "report": "evaluation/results/visualizations/benchmark_report.html",
-  "social_post_draft": "evaluation/results/visualizations/linkedin_post_draft.md",
-  "warnings": [
-    "Aggregate JSON says n_samples=2, but disagreements.csv contains 1 row(s). These files may come from different runs or the CSV may contain only a subset."
-  ]
+  "report": "evaluation\\results\\visualizations\\benchmark_report.html",
+  "social_post_draft": "evaluation\\results\\visualizations\\linkedin_post_draft.md",
+  "warnings": []
 }

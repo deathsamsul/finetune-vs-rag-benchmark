@@ -251,6 +251,13 @@ def main():
     if not rows:
         warnings.append("No disagreement rows were loaded; per-question and latency charts may be unavailable.")
 
+    # Also attempt generating pro visualization suite (embeddings PCA, dataset distributions, radar, latency ECDF)
+    try:
+        from evaluation.pro_visualizations import render_all_pro_visualizations
+        render_all_pro_visualizations()
+    except Exception as e:
+        warnings.append(f"Pro visualizations suite skipped: {e}")
+
     chart_files = []
     if save_metric_comparison(scores, out):
         chart_files.append(("Aggregate metric comparison", "aggregate_metric_comparison.png"))
@@ -266,6 +273,17 @@ def main():
     delta_title = save_delta_chart(rows, out)
     if delta_title:
         chart_files.append((f"Per-sample score differences — {delta_title}", "score_delta.png"))
+
+    # Include pro visualization charts in reports if available
+    pro_chart_specs = [
+        ("Multidimensional architecture radar", "architecture_radar.png"),
+        ("Inference latency deep dive (ECDF & spread)", "latency_deep_dive.png"),
+        ("Semantic embedding space (PCA 2D projection)", "embedding_space_pca.png"),
+        ("Dataset intelligence & length distributions", "dataset_distributions.png"),
+    ]
+    for title, filename in pro_chart_specs:
+        if (out / filename).exists() and (title, filename) not in chart_files:
+            chart_files.append((title, filename))
 
     # Compact metric table and evidence-based observations.
     all_metrics = list(dict.fromkeys([*ft.keys(), *rag.keys()]))
@@ -410,12 +428,6 @@ small {{ color: #555; }}
         json.dumps(summary, indent=2), encoding="utf-8"
     )
 
-    # Also generate pro visualization suite (embeddings PCA, dataset distributions, radar, latency ECDF)
-    try:
-        from evaluation.pro_visualizations import render_all_pro_visualizations
-        render_all_pro_visualizations()
-    except Exception as e:
-        print(f"Note: Pro visualizations skipped ({e})")
 
     print("\nVisualization generation complete.")
     print(f"Output directory: {out}")
